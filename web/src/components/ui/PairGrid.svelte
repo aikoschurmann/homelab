@@ -13,8 +13,10 @@
         <div class="pg-r pg-h">{#each heads as h}<div class="half">{h}</div>{/each}</div>
     {/if}
     {#each rows as pair}
-        <div class="pg-r">
-            {#each pair as c}
+        <!-- a line with only one pair spans the full width instead of leaving half of it blank -->
+        {@const lone = pair.filter(Boolean).length === 1}
+        <div class="pg-r" class:lone>
+            {#each lone ? pair.filter(Boolean) : pair as c}
                 <div class="half" class:empty={!c}>
                     {#if c}
                         <span class="pg-k">{c.k}</span>
@@ -51,6 +53,7 @@
     .pg { border-top: 1px solid var(--border); }
     .pg-r { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--border); }
     .pg-r:last-child { border-bottom: none; }
+    .pg-r.lone { grid-template-columns: 1fr; }
     .half { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 0 16px; align-items: center; min-height: 52px; padding: 8px 24px; box-sizing: border-box; font-size: 13.5px; }
     .half + .half { border-left: 1px solid var(--border); }
     .pg-h .half { display: block; min-height: 0; padding: 12px 24px 10px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); padding-top: 14px; }
