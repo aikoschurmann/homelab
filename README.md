@@ -33,11 +33,15 @@ OrbStack, Tailscale, cloudflared, Docker, tmux.
 The first visit walks you through five short steps: name the server, pick a look, choose
 (or create) the main OrbStack machine, connect Tailscale, done.
 
-<p>
-  <img src="docs/screenshots/setup-name.png" width="32%" alt="Setup: name this server" />
-  <img src="docs/screenshots/setup-look.png" width="32%" alt="Setup: pick a look" />
-  <img src="docs/screenshots/setup-machines.png" width="32%" alt="Setup: main machine" />
-</p>
+<img src="docs/screenshots/setup-name.png" width="720" alt="Setup: name this server" />
+
+<img src="docs/screenshots/setup-machines.png" width="720" alt="Setup: choose or create the main machine" />
+
+<details>
+<summary>The look step</summary>
+<br>
+<img src="docs/screenshots/setup-look.png" width="720" alt="Setup: pick a look" />
+</details>
 
 Everything there can be changed later under **Settings**. On a server that's already set up,
 `/?setup` replays the flow as a preview that saves nothing.
