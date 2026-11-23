@@ -38,6 +38,7 @@ export const NAV = [
             page('alerts', 'Alerts'),
             page('backups', 'Backups'),
             page('sharing', 'Sharing'),
+            page('access', 'Access'),
             page('data', 'Data'),
             page('integrations', 'Integrations'),
             page('hosts', 'Hosts & machines'),

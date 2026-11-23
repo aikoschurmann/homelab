@@ -97,26 +97,38 @@ def create_app():
                     _ts["at"] = time.time() - 50  # retry soon, keep the last good list
             return _ts["mine"]
 
-    def _ip_trusted(ip, port):
+    from app.core import access
+
+    def _caller(ip, port):
+        """('owner', None) for this Mac and the owner's devices, (role, who) for someone given
+        access in Settings → Access, or None."""
         try:
             addr = ipaddress.ip_address(ip)
         except ValueError:
-            return False
+            return None
         if addr.version == 6 and addr.ipv4_mapped:
             addr = addr.ipv4_mapped
         if any(addr in net for net in LOOPBACK):
-            return _loopback_allowed(ip, port)
+            return ('owner', None) if _loopback_allowed(ip, port) else None
         if addr in TAILNET:
             # a device that joined in the last minute isn't in the cached list yet
-            return str(addr) in _my_tailnet_ips() or str(addr) in _my_tailnet_ips(refresh=True)
-        return False
+            if str(addr) in _my_tailnet_ips() or str(addr) in _my_tailnet_ips(refresh=True):
+                return ('owner', None)
+            role, who = access.role_of(str(addr))
+            return (role, who) if role else None
+        return None
 
     @app.before_request
     def restrict_ips():
+        from flask import g
         ip = request.remote_addr
-        if not ip or not _ip_trusted(ip, request.environ.get('REMOTE_PORT')):
+        c = _caller(ip, request.environ.get('REMOTE_PORT')) if ip else None
+        if not c:
             log.warning(f"Blocked request from {ip}")
             return jsonify({"status": "error", "message": "Access denied. Network not trusted."}), 403
+        g.role, g.who = c
+        if g.role == 'viewer' and not access.viewer_allowed(request.method, request.path):
+            return jsonify({"status": "error", "message": "You have read-only access to this dashboard."}), 403
 
     def _same_origin(origin):
         o, h = urlparse(origin), urlparse('//' + request.host)
@@ -156,6 +168,7 @@ def create_app():
     from app.api.hardware import hardware_bp
     from app.api.logs import logs_bp
     from app.api.updates import updates_bp
+    from app.api.access import access_bp
 
     app.register_blueprint(system_bp, url_prefix='/api')
     app.register_blueprint(tmux_bp, url_prefix='/api/tmux')
@@ -175,6 +188,7 @@ def create_app():
     app.register_blueprint(hardware_bp, url_prefix='/api/hardware')
     app.register_blueprint(logs_bp, url_prefix='/api/logs')
     app.register_blueprint(updates_bp, url_prefix='/api/updates')
+    app.register_blueprint(access_bp, url_prefix='/api/access')
 
     # Register websocket
     from app.websocket.terminal import register_websocket

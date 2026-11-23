@@ -1,4 +1,5 @@
 <script>
+    import AccessSettings from './AccessSettings.svelte';
     import { SN, server, saveServer } from '../lib/server.js';
     import { onMount } from 'svelte';
     import { Loader2, Send, ExternalLink, Check, Trash2, Server, Box, ChevronRight, User } from 'lucide-svelte';
@@ -17,7 +18,7 @@
     export let onNavigate = () => {};
 
     const TABS = [{ id: 'general', label: 'General' }, { id: 'alerts', label: 'Alerts' }, { id: 'backups', label: 'Backups' }, { id: 'sharing', label: 'Sharing' },
-        { id: 'data', label: 'Data' }, { id: 'integrations', label: 'Integrations' }, { id: 'hosts', label: 'Hosts & machines' }];
+        { id: 'access', label: 'Access' }, { id: 'data', label: 'Data' }, { id: 'integrations', label: 'Integrations' }, { id: 'hosts', label: 'Hosts & machines' }];
     // old section links (#settings/appearance, …) land on the tab that now holds them
     const OLD = { appearance: 'general', polling: 'general', tailscale: 'integrations' };
     // the network tools are a page of their own now
@@ -495,6 +496,9 @@
             </div>
         {/if}
     </section>
+
+    {:else if tab === 'access'}
+        <AccessSettings />
 
     {:else if tab === 'data'}
     <section class="ui-card">

@@ -142,7 +142,10 @@ HOMELAB_HOME=/tmp/homelab-test HOMELAB_PORT=5099 ./run.sh
 ## Security
 
 The dashboard only answers this computer and **your own** Tailscale devices. Requests from
-anywhere else, including OrbStack containers going through localhost, get a 403. Nothing is
+anywhere else, including OrbStack containers going through localhost, get a 403.
+Other people on your tailnet (members, or people you shared a device with) can be let in
+under **Settings → Access**, by their Tailscale login: *View* sees everything but changes
+nothing (no terminal, no backup downloads), *Full* can do everything except change access. Nothing is
 reachable from the internet unless you share a machine through a Cloudflare Tunnel yourself.
 Keys and tokens stay on the server and never reach the browser.
 

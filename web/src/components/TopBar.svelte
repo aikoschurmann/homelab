@@ -10,6 +10,10 @@
     import { tsCounts, fetchTailnet } from '../lib/tailscale.js';
     import { cfCounts } from '../lib/cloudflare.js';
     import { databases } from '../lib/databases.js';
+    import { onMount } from 'svelte';
+    // someone the owner gave view-only access sees that here (the server refuses their changes)
+    let me = null;
+    onMount(async () => { try { const j = await fetch('/api/access/me').then(r => r.json()); if (j.status === 'success') me = j.data; } catch (e) {} });
     import { backups } from '../lib/backups.js';
     export let activeTab;
     export let activeSection = null;
@@ -74,6 +78,7 @@
             <span class="search-txt">Search or run a command</span>
             <span class="keys"><kbd>{isMac ? '⌘' : 'Ctrl'}</kbd><kbd>K</kbd></span>
         </button>
+        {#if me && me.role === 'viewer'}<span class="ui-tag viewonly" title="Signed in through Tailscale as {me.login}">View only · {me.name}</span>{/if}
         <div class="uplink-wrap"><UplinkStatus compact /></div>
     </div>
 </header>
@@ -114,4 +119,5 @@
         .right { gap: 4px; }
         .search { width: 32px; height: 32px; padding: 0; justify-content: center; border: none; background: none; }
     }
+    .viewonly { white-space: nowrap; }
 </style>
