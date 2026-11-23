@@ -336,7 +336,7 @@ VERBS = {
 VERB_FROM = {**{v: 5 for v in ('vm-start', 'vm-stop', 'vm-restart', 'disk-eject', 'volume-mount')},
              'backup-folders': 8, 'backup': 9, 'backup-sizes': 13}
 NO_TARGET = {'reboot', 'update-agent', 'backup-folders', 'backup-sizes'}
-AGENT_VERSION = 14          # what install.sh hands out now; bump with every change to AGENT_SH
+AGENT_VERSION = 15          # what install.sh hands out now; bump with every change to AGENT_SH
 BACKUP_FROM = 9             # first agent version that sends folders for the nightly backup (8 had a bug)
 BACKUP_TTL = 3 * 3600       # a big folder can take a while to pack and send
 TARGET_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9@._:_-]{0,127}$')
@@ -519,6 +519,19 @@ def _sections(text):
     if name is not None:
         out[name] = '\n'.join(buf)
     return out
+
+
+@hosts_bp.route('/hidtemps', methods=['GET'])
+def hidtemps_binary():
+    """The Mac temperature reader (universal binary), for agents on other Macs."""
+    from flask import send_file
+    if not _by_token(request.headers.get('Authorization', '').removeprefix('Bearer ').strip()):
+        return jsonify({"status": "error", "message": "unknown token"}), 401
+    from app.services.hardware import universal_helper
+    b = universal_helper()
+    if not b:
+        return jsonify({"status": "error", "message": "Could not build the reader (no clang?)"}), 503
+    return send_file(b, mimetype='application/octet-stream', as_attachment=True, download_name='hidtemps')
 
 
 @hosts_bp.route('/inventory', methods=['POST'])
@@ -1222,6 +1235,13 @@ inventory() {
   # hardware health: temperatures, drive SMART (needs root and smartctl), UPS (NUT's upsc)
   if [ "$OS_KIND" = Darwin ]; then
     echo "#@pmset ps"; pmset -g ps 2>/dev/null
+    # temperatures need a small IOKit reader; the dashboard builds it and this fetches it once
+    T="$HOME/.arrakis-agent/hidtemps"
+    if [ ! -x "$T" ] && command -v curl >/dev/null 2>&1; then
+      curl -fsS -m 30 -H "Authorization: Bearer $TOKEN" -o "$T.tmp" "$URL/api/hosts/hidtemps" 2>/dev/null \
+        && chmod 755 "$T.tmp" && mv "$T.tmp" "$T" || rm -f "$T.tmp"
+    fi
+    [ -x "$T" ] && { echo "#@temps"; "$T" 2>/dev/null; }
   else
     echo "#@temps"
     for z in /sys/class/thermal/thermal_zone*; do

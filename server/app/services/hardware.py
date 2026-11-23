@@ -49,6 +49,28 @@ def _helper():
         return None
 
 
+def universal_helper():
+    """The sensor reader for both Apple silicon and Intel Macs, which agents on other Macs
+    download (they may have no compiler)."""
+    src, out = os.path.abspath(SRC), BIN + '-universal'
+    try:
+        if os.path.exists(out) and os.path.getmtime(out) >= os.path.getmtime(src):
+            return out
+        if not shutil.which('clang'):
+            return None
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        r = subprocess.run(['clang', '-O2', '-arch', 'arm64', '-arch', 'x86_64', '-mmacosx-version-min=11.0',
+                            '-framework', 'IOKit', '-framework', 'CoreFoundation', src, '-o', out],
+                           capture_output=True, text=True, timeout=180)
+        if r.returncode != 0:
+            log.warning(f"hidtemps universal build failed: {r.stderr[-300:]}")
+            return None
+        return out
+    except Exception as e:
+        log.warning(f"hidtemps universal: {e}")
+        return None
+
+
 def summarize_temps(pairs):
     """[(name, °C)] -> {"cpu", "ssd", "sensors"}: CPU = hottest die/core sensor, SSD = hottest NAND/NVMe."""
     pairs = [(n, c) for n, c in pairs if c is not None and -20 < c < 150]
@@ -206,7 +228,10 @@ def from_inventory(sections):
     data = {"temps": None, "drives": [], "power": None, "thermal": None}
     pairs = []
     for line in (sections.get('temps') or '').splitlines():
-        name, _, v = line.rpartition(' ')
+        bits = line.strip().rsplit(None, 1)
+        if len(bits) != 2:
+            continue
+        name, v = bits
         try:
             c = float(v)
             pairs.append((name.strip() or 'sensor', c / 1000 if c > 1000 else c))
