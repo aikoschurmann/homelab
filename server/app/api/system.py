@@ -895,7 +895,7 @@ def get_endpoints_config():
         ]},
         {"name": "Tailscale", "endpoints": [
             ep("ts-status", "GET", "/api/tailscale", "Every device on the tailnet as this Mac sees it"),
-            ep("ts-ping", "POST", "/api/tailscale/ping/{ip}", "Ping a device and report direct or relayed", p("ip", "100.126.170.120")),
+            ep("ts-ping", "POST", "/api/tailscale/ping/{ip}", "Ping a device and report direct or relayed", p("ip", "100.64.0.1")),
             ep("net-speedtest", "GET", "/api/network/speedtest", "Latest speed test result"),
             ep("net-speedtest-run", "POST", "/api/network/speedtest", "Start a speed test"),
         ]},
