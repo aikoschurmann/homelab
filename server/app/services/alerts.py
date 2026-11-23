@@ -18,6 +18,16 @@ def load_alert_prefs():
         "enabled": bool(prefs.get('alerts_enabled', False)),
         "discord_webhook": (prefs.get('alerts_discord_webhook') or '').strip(),
         "ntfy_url": (prefs.get('alerts_ntfy_url') or '').strip(),
+        "telegram_token": (prefs.get('alerts_telegram_token') or '').strip(),
+        "telegram_chat": str(prefs.get('alerts_telegram_chat') or '').strip(),
+        "pushover_user": (prefs.get('alerts_pushover_user') or '').strip(),
+        "pushover_token": (prefs.get('alerts_pushover_token') or '').strip(),
+        "webhook_url": (prefs.get('alerts_webhook_url') or '').strip(),
+        "email_host": (prefs.get('alerts_email_host') or '').strip(),
+        "email_port": int(prefs.get('alerts_email_port') or 587),
+        "email_user": (prefs.get('alerts_email_user') or '').strip(),
+        "email_password": prefs.get('alerts_email_password') or '',
+        "email_to": (prefs.get('alerts_email_to') or '').strip(),
         "disk_threshold": int(prefs.get('alerts_disk_threshold', 90)),
         # which kinds of problem to report (category -> on); missing = on
         "kinds": {k: bool((prefs.get('alerts_kinds') or {}).get(k, True)) for k in CATEGORY_LABEL},
@@ -93,6 +103,68 @@ def _discord_payload(title, body, kind, key, since):
     return {"username": server_cfg.name(), "embeds": [embed], "allowed_mentions": {"parse": []}}
 
 
+def channels(prefs):
+    """The channels that are filled in enough to send."""
+    return [c for c, ok in (
+        ('discord', prefs['discord_webhook']),
+        ('ntfy', prefs['ntfy_url']),
+        ('telegram', prefs['telegram_token'] and prefs['telegram_chat']),
+        ('pushover', prefs['pushover_user'] and prefs['pushover_token']),
+        ('email', prefs['email_host'] and prefs['email_to']),
+        ('webhook', prefs['webhook_url']),
+    ) if ok]
+
+
+def _post_json(url, payload, timeout=10):
+    req = urllib.request.Request(url, method='POST', data=json.dumps(payload).encode(),
+                                 headers={'Content-Type': 'application/json', 'User-Agent': 'homelab-dashboard'})
+    urllib.request.urlopen(req, timeout=timeout).close()
+
+
+def _send_telegram(prefs, title, body, kind):
+    icon = {'alert': '🔴', 'warning': '🟠', 'resolved': '🟢', 'info': '🔵', 'test': '🔔'}.get(kind, '')
+    _post_json(f"https://api.telegram.org/bot{prefs['telegram_token']}/sendMessage",
+               {"chat_id": prefs['telegram_chat'], "text": f"{icon} {title}\n{body}".strip(), "disable_web_page_preview": True})
+
+
+def _send_pushover(prefs, title, body, kind):
+    from urllib.parse import urlencode
+    data = urlencode({"token": prefs['pushover_token'], "user": prefs['pushover_user'], "title": title,
+                      "message": body or title, "priority": 1 if kind == 'alert' else 0}).encode()
+    urllib.request.urlopen(urllib.request.Request('https://api.pushover.net/1/messages.json', data=data, method='POST'), timeout=10).close()
+
+
+def _send_email(prefs, title, body, kind):
+    import smtplib, ssl
+    from email.message import EmailMessage
+    msg = EmailMessage()
+    msg['Subject'] = f"[{server_cfg.name()}] {title}"
+    msg['From'] = prefs['email_user'] or f"homelab@{server_cfg.name().lower()}"
+    msg['To'] = prefs['email_to']
+    msg.set_content(f"{body}\n\n— {server_cfg.name()} homelab dashboard")
+    port = prefs['email_port']
+    ctx = ssl.create_default_context()
+    if port == 465:
+        smtp = smtplib.SMTP_SSL(prefs['email_host'], port, timeout=15, context=ctx)
+    else:
+        smtp = smtplib.SMTP(prefs['email_host'], port, timeout=15)
+        smtp.ehlo()
+        if smtp.has_extn('starttls'):
+            smtp.starttls(context=ctx); smtp.ehlo()
+    try:
+        if prefs['email_user'] and prefs['email_password']:
+            smtp.login(prefs['email_user'], prefs['email_password'])
+        smtp.send_message(msg)
+    finally:
+        try: smtp.quit()
+        except Exception: pass
+
+
+def _send_webhook(prefs, title, body, kind, key, since):
+    _post_json(prefs['webhook_url'], {"title": title, "body": body, "kind": kind, "key": key, "since": since,
+                                      "server": server_cfg.name(), "at": int(time.time())})
+
+
 def send_alert(title, body, prefs=None, kind='alert', key=None, since=None):
     """Push to every configured channel. Returns a list of (channel, error-or-None).
     kind: alert | warning | resolved | info | test; key: 'category:target'; since: unix time the problem began."""
@@ -116,6 +188,17 @@ def send_alert(title, body, prefs=None, kind='alert', key=None, since=None):
             results.append(('ntfy', None))
         except Exception as e:
             results.append(('ntfy', str(e)))
+    for name, fn in (('telegram', lambda: _send_telegram(prefs, title, body, kind)),
+                     ('pushover', lambda: _send_pushover(prefs, title, body, kind)),
+                     ('email', lambda: _send_email(prefs, title, body, kind)),
+                     ('webhook', lambda: _send_webhook(prefs, title, body, kind, key, since))):
+        if name not in channels(prefs):
+            continue
+        try:
+            fn(); results.append((name, None))
+        except Exception as e:
+            # never echo the Telegram bot token, which sits in the URL
+            results.append((name, str(e).replace(prefs['telegram_token'], '…') if prefs['telegram_token'] else str(e)))
     for channel, err in results:
         if err: log.warning(f"Alert via {channel} failed: {err}")
     return results
@@ -257,7 +340,7 @@ ALERT_TITLES = {
 
 
 def _alerts_active(prefs):
-    return prefs['enabled'] and (prefs['discord_webhook'] or prefs['ntfy_url'])
+    return prefs['enabled'] and bool(channels(prefs))
 
 
 def notify_action(category, target, action, ok=True, error=None):

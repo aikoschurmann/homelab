@@ -68,9 +68,9 @@ def storage_forecast():
 
 @system_bp.route('/alerts/test', methods=['POST'])
 def alerts_test():
-    from app.services.alerts import send_alert, load_alert_prefs
+    from app.services.alerts import send_alert, load_alert_prefs, channels
     prefs = load_alert_prefs()
-    if not (prefs['discord_webhook'] or prefs['ntfy_url']):
+    if not channels(prefs):
         return jsonify({"status": "error", "message": "No alert channel configured"})
     results = send_alert('Test alert', 'Alerts from your homelab dashboard are working.', prefs, kind='test')
     failed = [f"{c}: {e}" for c, e in results if e]
@@ -433,13 +433,17 @@ def vm_command(cmd):
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
-SECRET_PREFS = ('alerts_discord_webhook', 'alerts_ntfy_url')
+SECRET_PREFS = ('alerts_discord_webhook', 'alerts_ntfy_url', 'alerts_telegram_token', 'alerts_pushover_user',
+                'alerts_pushover_token', 'alerts_email_password', 'alerts_webhook_url')
 
 
 def _mask(url):
-    """Recognisable but useless copy of a secret URL: the host and the last 4 characters."""
+    """Recognisable but useless copy of a secret: a URL's host and the last 4 characters,
+    or just the last 4 characters of a token or password."""
     if not url:
         return url
+    if '://' not in url:
+        return '••••' + url[-4:] if len(url) > 8 else '••••'
     from urllib.parse import urlparse
     u = urlparse(url)
     return f"{u.scheme}://{u.netloc}/…{url[-4:]}"
@@ -975,7 +979,7 @@ ROUTE_DOCS = {
     "GET /api/network/tailscale": "Tailscale status for the network widgets",
     "POST /api/backups/{timestamp}/reveal": "Show a snapshot in Finder",
     "GET /api/backups/file/{name}": "Download one backup file",
-    "POST /api/alerts/test": "Send a test alert to the configured Discord / ntfy targets",
+    "POST /api/alerts/test": "Send a test alert to every configured channel",
     "GET /api/log_error": "Record a front-end error in the backend log",
     "POST /api/prefs": "Save dashboard preferences",
     "GET /api/stats_stream": "Live stats as Server-Sent Events",

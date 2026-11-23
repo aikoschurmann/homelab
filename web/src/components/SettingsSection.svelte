@@ -59,17 +59,17 @@
         ['backup', 'Backups', 'A backup is overdue or incomplete'],
     ];
     const allKinds = () => Object.fromEntries(KINDS.map(([k]) => [k, true]));
-    let alerts = { enabled: false, discord: '', ntfy: '', disk: 90, kinds: allKinds(), repeat: 6, grace: 60, resolved: true, actions: true, quiet: false, qFrom: 23, qTo: 8 };
+    let alerts = { enabled: false, discord: '', ntfy: '', tgToken: '', tgChat: '', poUser: '', poToken: '', hook: '', mHost: '', mPort: 587, mUser: '', mPass: '', mTo: '', disk: 90, kinds: allKinds(), repeat: 6, grace: 60, resolved: true, actions: true, quiet: false, qFrom: 23, qTo: 8 };
     const HOURS = Array.from({ length: 24 }, (_, h) => h);
     const hh = (h) => String(h).padStart(2, '0') + ':00';
     let saved = null;            // last saved copy, to know when there are changes
     let alertsTesting = false, alertsState = '';   // '' | 'saving' | 'saved' | 'error'
     $: dirty = saved && JSON.stringify(alerts) !== JSON.stringify(saved);
-    $: hasChannel = alerts.discord.trim() || alerts.ntfy.trim();
+    $: hasChannel = alerts.discord.trim() || alerts.ntfy.trim() || (alerts.tgToken.trim() && alerts.tgChat.trim()) || (alerts.poUser.trim() && alerts.poToken.trim()) || alerts.hook.trim() || (alerts.mHost.trim() && alerts.mTo.trim());
     // alerts save themselves shortly after the last edit, like every other setting here
     let saveTimer;
     // the "Saved" note shows in whichever card holds the setting that changed
-    const CARD = { enabled: 'main', discord: 'main', ntfy: 'main', kinds: 'report', resolved: 'report', actions: 'report',
+    const CARD = { enabled: 'main', discord: 'main', ntfy: 'main', tgToken: 'main', tgChat: 'main', poUser: 'main', poToken: 'main', hook: 'main', mHost: 'main', mPort: 'main', mUser: 'main', mPass: 'main', mTo: 'main', kinds: 'report', resolved: 'report', actions: 'report',
                    disk: 'timing', repeat: 'timing', grace: 'timing', quiet: 'timing', qFrom: 'timing', qTo: 'timing' };
     let saveCard = null, savedTimer;
     $: if (dirty) {
@@ -86,6 +86,16 @@
                 alerts_enabled: sent.enabled,
                 alerts_discord_webhook: sent.discord.trim(),
                 alerts_ntfy_url: sent.ntfy.trim(),
+                alerts_telegram_token: sent.tgToken.trim(),
+                alerts_telegram_chat: sent.tgChat.trim(),
+                alerts_pushover_user: sent.poUser.trim(),
+                alerts_pushover_token: sent.poToken.trim(),
+                alerts_webhook_url: sent.hook.trim(),
+                alerts_email_host: sent.mHost.trim(),
+                alerts_email_port: parseInt(sent.mPort) || 587,
+                alerts_email_user: sent.mUser.trim(),
+                alerts_email_password: sent.mPass,
+                alerts_email_to: sent.mTo.trim(),
                 alerts_disk_threshold: Math.min(99, Math.max(50, parseInt(sent.disk) || 90)),
                 alerts_kinds: sent.kinds,
                 alerts_repeat_hours: sent.repeat,
@@ -234,6 +244,16 @@
                     enabled: !!j.data.alerts_enabled,
                     discord: j.data.alerts_discord_webhook || '',
                     ntfy: j.data.alerts_ntfy_url || '',
+                    tgToken: j.data.alerts_telegram_token || '',
+                    tgChat: String(j.data.alerts_telegram_chat || ''),
+                    poUser: j.data.alerts_pushover_user || '',
+                    poToken: j.data.alerts_pushover_token || '',
+                    hook: j.data.alerts_webhook_url || '',
+                    mHost: j.data.alerts_email_host || '',
+                    mPort: j.data.alerts_email_port || 587,
+                    mUser: j.data.alerts_email_user || '',
+                    mPass: j.data.alerts_email_password || '',
+                    mTo: j.data.alerts_email_to || '',
                     disk: j.data.alerts_disk_threshold || 90,
                     kinds: { ...allKinds(), ...(j.data.alerts_kinds || {}) },
                     repeat: j.data.alerts_repeat_hours ?? 6,
@@ -334,9 +354,41 @@
                 <div><label class="ui-label" for="a-ntfy">ntfy topic</label><div class="ui-hint">Phone push via the ntfy app</div></div>
                 <input id="a-ntfy" class="ui-input mono" type="url" placeholder="https://ntfy.sh/arrakis-xxxxxxxx" bind:value={alerts.ntfy} />
             </div>
+            <div class="ui-form-row">
+                <div><label class="ui-label" for="a-tg">Telegram</label><div class="ui-hint">A bot token from @BotFather, and the chat to post in</div></div>
+                <div class="inline pair">
+                    <input id="a-tg" class="ui-input mono" placeholder="Bot token" autocomplete="off" spellcheck="false" bind:value={alerts.tgToken} />
+                    <input class="ui-input mono chat" placeholder="Chat ID" autocomplete="off" spellcheck="false" aria-label="Telegram chat ID" bind:value={alerts.tgChat} />
+                </div>
+            </div>
+            <div class="ui-form-row">
+                <div><label class="ui-label" for="a-po">Pushover</label><div class="ui-hint">Your user key and an app's API token</div></div>
+                <div class="inline pair">
+                    <input id="a-po" class="ui-input mono" placeholder="User key" autocomplete="off" spellcheck="false" bind:value={alerts.poUser} />
+                    <input class="ui-input mono" placeholder="API token" autocomplete="off" spellcheck="false" aria-label="Pushover API token" bind:value={alerts.poToken} />
+                </div>
+            </div>
+            <div class="ui-form-row">
+                <div><label class="ui-label" for="a-mhost">Email</label><div class="ui-hint">An SMTP server; port 587 uses STARTTLS, 465 TLS</div></div>
+                <div class="stack">
+                    <div class="inline">
+                        <input id="a-mhost" class="ui-input mono" placeholder="smtp.example.com" autocomplete="off" spellcheck="false" bind:value={alerts.mHost} />
+                        <input class="ui-input mono port" type="number" min="1" max="65535" aria-label="SMTP port" bind:value={alerts.mPort} />
+                    </div>
+                    <div class="inline">
+                        <input class="ui-input" placeholder="Username (optional)" autocomplete="off" aria-label="SMTP username" bind:value={alerts.mUser} />
+                        <input class="ui-input" type="password" placeholder="Password" autocomplete="new-password" aria-label="SMTP password" bind:value={alerts.mPass} />
+                    </div>
+                    <input class="ui-input" type="email" placeholder="Send to, e.g. you@example.com" aria-label="Send alerts to" bind:value={alerts.mTo} />
+                </div>
+            </div>
+            <div class="ui-form-row">
+                <div><label class="ui-label" for="a-hook">Webhook</label><div class="ui-hint">Gets a JSON POST: title, body, kind, key</div></div>
+                <input id="a-hook" class="ui-input mono" type="url" placeholder="https://example.com/hooks/homelab" bind:value={alerts.hook} />
+            </div>
         </div>
         <div class="ui-card-foot">
-            <span>{#if !hasChannel}Add Discord or ntfy to receive alerts{/if}</span>
+            <span>{#if !hasChannel}Add a channel to receive alerts{/if}</span>
             <button class="ui-btn sm" disabled={alertsTesting || !hasChannel} on:click={testAlerts}>{#if alertsTesting}<Loader2 size={13} class="ui-spin" />{:else}<Send size={13} />{/if} Send test</button>
         </div>
     </section>
@@ -560,7 +612,11 @@
     .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 10px; background: var(--highlight-30); vertical-align: middle; }
     .dot.ok { background: var(--green); }
     .dot.bad { background: var(--red); }
-    .inline .ui-input.port { flex: 0 0 90px; min-width: 0; }
+    .inline .ui-input.port, .inline .ui-input.chat { flex: 0 0 96px; min-width: 0; }
+    .inline .ui-input.chat { flex-basis: 140px; }
+    .pair { width: 100%; max-width: 560px; }
+    .stack { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 560px; }
+    .stack > .ui-input { max-width: 460px; }
     .res { font-size: 13px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
     .res.err { color: var(--red); }
     .hour { width: 92px; }
