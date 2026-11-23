@@ -246,6 +246,8 @@ def start_all_pollers():
     threading.Thread(target=poll_db_loop, daemon=True).start()
     from app.services.alerts import alerts_loop
     threading.Thread(target=alerts_loop, daemon=True).start()
+    from app.services import uptime
+    uptime.start()
 
 def docker_events_loop():
     last_update = 0

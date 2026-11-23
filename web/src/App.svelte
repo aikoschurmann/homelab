@@ -19,6 +19,7 @@
     import { legacyRoute, pathOf } from './lib/infra.js';
     import TailscaleTab from './components/TailscaleTab.svelte';
     import CloudflareTab from './components/CloudflareTab.svelte';
+    import UptimeTab from './components/UptimeTab.svelte';
     import Sortable from 'sortablejs';
     import { Loader2 } from 'lucide-svelte';
     import { stats as statsStore, uplink, visible, machines } from './lib/stores.js';
@@ -344,6 +345,10 @@
 
                 {#if activeTab === 'Cloudflare'}
                     <CloudflareTab section={activeSection} onNavigate={navigate} />
+                {/if}
+
+                {#if activeTab === 'Uptime'}
+                    <UptimeTab />
                 {/if}
 
 

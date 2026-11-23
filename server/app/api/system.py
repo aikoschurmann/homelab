@@ -952,11 +952,13 @@ GROUP_DOCS = {
     "Backups": "Backup snapshots and their schedule.",
     "Terminal": "tmux sessions on the Mac and in machines.",
     "Tools": "Small utilities like ping and port checks.",
+    "Uptime": "Websites and services checked on a schedule, with certificate expiry.",
     "Dashboard": "The dashboard's own data: stats stream, history, preferences and this catalog.",
     "Internal": "Plumbing for the agent, live streams and the terminal. Not meant to be called by hand.",
 }
 _BP_GROUP = {"vms": "Machines", "hosts": "Hosts", "compute": "Compute", "storage": "Storage", "tailscale": "Tailscale",
-             "databases": "Databases", "backups": "Backups", "tmux": "Terminal", "services": "Services"}
+             "databases": "Databases", "backups": "Backups", "tmux": "Terminal", "services": "Services",
+             "uptime": "Uptime"}
 
 
 # Descriptions for routes whose view has no docstring (keyed "METHOD path").
@@ -980,6 +982,11 @@ ROUTE_DOCS = {
     "POST /api/backups/{timestamp}/reveal": "Show a snapshot in Finder",
     "GET /api/backups/file/{name}": "Download one backup file",
     "POST /api/alerts/test": "Send a test alert to every configured channel",
+    "GET /api/uptime": "Uptime checks with their last result, 24 h history and certificate expiry",
+    "POST /api/uptime": "Add an uptime check (name, url, every, expect) and run it once",
+    "PUT /api/uptime/{cid}": "Change an uptime check",
+    "DELETE /api/uptime/{cid}": "Remove an uptime check and its history",
+    "POST /api/uptime/{cid}/run": "Run an uptime check now",
     "GET /api/log_error": "Record a front-end error in the backend log",
     "POST /api/prefs": "Save dashboard preferences",
     "GET /api/stats_stream": "Live stats as Server-Sent Events",

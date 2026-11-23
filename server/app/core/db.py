@@ -43,6 +43,10 @@ def init_db():
         # machine's graphs survive a dashboard restart or a moment the machine looked stopped
         c.execute('''CREATE TABLE IF NOT EXISTS machine_metrics (timestamp REAL, host TEXT, name TEXT, cpu REAL, mem REAL, mem_limit REAL)''')
         c.execute('CREATE INDEX IF NOT EXISTS idx_machine_ts ON machine_metrics(host, name, timestamp)')
+        # uptime checks of websites and services (app/services/uptime.py)
+        c.execute('''CREATE TABLE IF NOT EXISTS uptime_checks (timestamp INTEGER, check_id TEXT, ok INTEGER, ms REAL, code INTEGER)''')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_uptime_ts ON uptime_checks(timestamp)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_uptime_id_ts ON uptime_checks(check_id, timestamp)')
         conn.commit()
         conn.close()
         get_writer() # start background thread
@@ -316,6 +320,7 @@ KEEP = {
     "services": ("service_metrics", "Container and daemon CPU / memory", 7, 90),
     "machines": ("machine_metrics", "OrbStack machine CPU / memory", 1, 30),
     "checks":   ("host_checks",     "Port checks of other hosts", 30, 365),
+    "uptime":   ("uptime_checks",   "Uptime checks of websites and services", 30, 365),
     "latency":  ("api_latency",     "API response times", 7, 90),
 }
 

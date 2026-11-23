@@ -1,7 +1,7 @@
 <script>
     import { THEMES, savedTheme, applyTheme } from '../lib/theme.js';
     import { onMount, tick, createEventDispatcher } from 'svelte';
-    import { Search, Activity, Boxes, Box, Network, Database, Archive, Terminal, Eye, Settings, Plus, RotateCw, PackageCheck, HardDriveUpload, Gauge, RefreshCw, Server, Cpu, Monitor, Palette, Cloud } from 'lucide-svelte';
+    import { Search, Activity, Boxes, Box, Network, Database, Archive, Terminal, Eye, Settings, Plus, RotateCw, PackageCheck, HardDriveUpload, Gauge, RefreshCw, Server, Cpu, Monitor, Palette, Cloud, HeartPulse } from 'lucide-svelte';
     import { machines } from '../lib/stores.js';
     import { hosts } from '../lib/hosts.js';
     import { services } from '../lib/services.js';
@@ -20,7 +20,7 @@
     // ---- commands -----------------------------------------------------------------------
     const PAGES = [
         ['Overview', 'overview', Activity], ['Infrastructure', 'infra', Server], ['OrbStack VM', 'infra/arrakis/vm', Boxes], ['macOS apps', 'infra/arrakis/apps', Box],
-        ['Tailscale', 'tailscale', Network], ['Cloudflare', 'cloudflare', Cloud], ['Databases', 'databases', Database], ['Backups', 'backups', Archive],
+        ['Tailscale', 'tailscale', Network], ['Cloudflare', 'cloudflare', Cloud], ['Uptime', 'uptime', HeartPulse], ['Databases', 'databases', Database], ['Backups', 'backups', Archive],
         ['Terminal', 'terminal', Terminal], ['API endpoints', 'endpoints', Eye], ['Settings', 'settings', Settings],
     ];
     // the Terminal page opens its "New session" dialog; it may not be mounted yet, so

@@ -1,5 +1,5 @@
 import { SN } from './server.js';
-import { Activity, Eye, Boxes, Database, Box, Archive, Terminal, Settings, Network, Server, Gauge, Cloud, Globe } from 'lucide-svelte';
+import { Activity, Eye, Boxes, Database, Box, Archive, Terminal, Settings, Network, Server, Gauge, Cloud, Globe, HeartPulse } from 'lucide-svelte';
 
 // Sidebar tree. A child with `el` is a section of its page (the element id it scrolls
 // to); a child with el: null is a page of its own (id '' = the tab's main page).
@@ -21,6 +21,7 @@ export const NAV = [
         // parent: the sidebar folds these into one entry; pages: its tabs show under it (filters stay on the page)
         { tab: 'Tailscale', icon: Network, parent: 'Network', pages: true, children: [page('', 'Devices'), page('ping', 'Ping'), page('people', 'People'), page('server', 'This server')] },
         { tab: 'Cloudflare', icon: Cloud, parent: 'Network', pages: true, children: [page('', 'Tunnels'), page('dns', 'DNS records')] },
+        { tab: 'Uptime', icon: HeartPulse, parent: 'Network' },
         { tab: 'Tools', label: 'Network tools', icon: Gauge, parent: 'Network', pages: true, children: [page('', 'Checks'), page('speed', 'Speed test'), page('computers', 'Computers'), page('api', 'API health')] },
         // sub: its children show in the sidebar too (other items keep theirs on the page)
         { tab: 'Databases', icon: Database, sub: true, children: [page('', 'All databases')] },
