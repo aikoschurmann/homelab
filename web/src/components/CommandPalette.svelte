@@ -20,7 +20,7 @@
     // ---- commands -----------------------------------------------------------------------
     const PAGES = [
         ['Overview', 'overview', Activity], ['Infrastructure', 'infra', Server], ['OrbStack VM', 'infra/arrakis/vm', Boxes], ['macOS apps', 'infra/arrakis/apps', Box],
-        ['Tailscale', 'tailscale', Network], ['Cloudflare', 'cloudflare', Cloud], ['Uptime', 'tools/uptime', HeartPulse], ['Logs', 'logs', ScrollText], ['Databases', 'databases', Database], ['Backups', 'backups', Archive],
+        ['Tailscale', 'tailscale', Network], ['Cloudflare', 'cloudflare', Cloud], ['Uptime', 'tools/uptime', HeartPulse], ['Logs', 'logs', ScrollText], ['Updates', 'updates', PackageCheck], ['Databases', 'databases', Database], ['Backups', 'backups', Archive],
         ['Terminal', 'terminal', Terminal], ['API endpoints', 'endpoints', Eye], ['Settings', 'settings', Settings],
     ];
     // the Terminal page opens its "New session" dialog; it may not be mounted yet, so
@@ -46,7 +46,7 @@
         { id: 'refresh', title: 'Refresh data', icon: RefreshCw, run: () => { dispatch('refresh'); toast('Refreshing…'); } },
         { id: 'reboot-host', title: 'Reboot the Mac', icon: RotateCw, danger: true, run: async () => { const r = await post('/api/host/command/reboot'); toast(r.status === 'success' ? 'Mac reboot started' : 'Reboot failed: ' + (r.message || r.stderr || 'unknown error')); } },
         { id: 'reboot-vm', title: 'Reboot the dashboard VM', icon: RotateCw, danger: true, run: () => { post('/api/vm/command/reboot'); toast('VM reboot started'); } },
-        { id: 'update', title: 'Update packages on the Mac and VM', icon: PackageCheck, danger: true, run: () => { post('/api/host/command/update'); post('/api/vm/command/update'); toast('Updates started'); } },
+        { id: 'update', title: 'Update packages on the Mac and VM', icon: PackageCheck, run: () => go('#updates') },
     ];
 
     $: items = [

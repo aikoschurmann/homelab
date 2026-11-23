@@ -20,6 +20,7 @@
     import TailscaleTab from './components/TailscaleTab.svelte';
     import CloudflareTab from './components/CloudflareTab.svelte';
     import LogsTab from './components/LogsTab.svelte';
+    import UpdatesTab from './components/UpdatesTab.svelte';
     import Sortable from 'sortablejs';
     import { Loader2 } from 'lucide-svelte';
     import { stats as statsStore, uplink, visible, machines } from './lib/stores.js';
@@ -349,6 +350,10 @@
 
                 {#if activeTab === 'Logs'}
                     <LogsTab />
+                {/if}
+
+                {#if activeTab === 'Updates'}
+                    <UpdatesTab />
                 {/if}
 
 

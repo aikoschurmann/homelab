@@ -24,7 +24,7 @@
     const deg = (c) => `${Math.round(c)} °C`;
     $: t = hw?.temps;
     $: left = hw ? [
-        t?.cpu != null && { k: 'CPU', v: deg(t.cpu), bad: t.cpu >= hw.warn.cpu, title: t.sensors.map(s => `${s.name}: ${s.c} °C`).join('\n') },
+        t?.cpu != null && { k: 'CPU', v: deg(t.cpu), bad: t.cpu >= hw.warn.cpu, title: `Hottest of ${t.sensors.length} sensors` },
         t?.ssd != null && { k: 'SSD', v: deg(t.ssd), bad: t.ssd >= hw.warn.ssd },
         ...(t ? [] : [{ k: 'Temperatures', v: 'Not reported' }]),
     ].filter(Boolean) : [];

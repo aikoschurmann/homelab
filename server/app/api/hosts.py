@@ -331,12 +331,12 @@ VERBS = {
     'service-start', 'service-stop', 'service-restart',
     'container-start', 'container-stop', 'container-restart',
     'vm-start', 'vm-stop', 'vm-restart', 'disk-eject', 'volume-mount',
-    'reboot', 'update-agent', 'backup-folders', 'backup-sizes', 'backup',
+    'reboot', 'update-agent', 'backup-folders', 'backup-sizes', 'backup', 'upgrade',
 }
 VERB_FROM = {**{v: 5 for v in ('vm-start', 'vm-stop', 'vm-restart', 'disk-eject', 'volume-mount')},
              'backup-folders': 8, 'backup': 9, 'backup-sizes': 13}
-NO_TARGET = {'reboot', 'update-agent', 'backup-folders', 'backup-sizes'}
-AGENT_VERSION = 15          # what install.sh hands out now; bump with every change to AGENT_SH
+NO_TARGET = {'reboot', 'update-agent', 'backup-folders', 'backup-sizes', 'upgrade'}
+AGENT_VERSION = 16          # what install.sh hands out now; bump with every change to AGENT_SH
 BACKUP_FROM = 9             # first agent version that sends folders for the nightly backup (8 had a bug)
 BACKUP_TTL = 3 * 3600       # a big folder can take a while to pack and send
 TARGET_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9@._:_-]{0,127}$')
@@ -1264,6 +1264,19 @@ inventory() {
   if command -v upsc >/dev/null 2>&1; then
     for u in $(upsc -l 2>/dev/null); do echo "#@upsc $u"; upsc "$u" 2>/dev/null; done
   fi
+  # outdated packages, refreshed at most every 30 minutes (listing them can take a while)
+  U="$HOME/.arrakis-agent/updates"
+  if [ ! -s "$U" ] || [ -n "$(find "$U" -mmin +30 2>/dev/null)" ]; then
+    { if [ "$OS_KIND" = Darwin ]; then
+        b=$(command -v brew || ls /opt/homebrew/bin/brew /usr/local/bin/brew 2>/dev/null | head -1)
+        [ -n "$b" ] && { echo "#@updates brew"; HOMEBREW_NO_AUTO_UPDATE=1 "$b" outdated --verbose 2>/dev/null; }
+      elif command -v apk >/dev/null 2>&1; then echo "#@updates apk"; apk list -u 2>/dev/null
+      elif command -v apt >/dev/null 2>&1; then echo "#@updates apt"; apt list --upgradable 2>/dev/null
+      elif command -v dnf >/dev/null 2>&1; then echo "#@updates dnf"; dnf -q -C check-update 2>/dev/null
+      elif command -v checkupdates >/dev/null 2>&1; then echo "#@updates pacman"; checkupdates 2>/dev/null
+      fi; true; } > "$U.tmp" 2>/dev/null && mv "$U.tmp" "$U"
+  fi
+  cat "$U" 2>/dev/null
   if command -v orb >/dev/null 2>&1; then
     if orb status 2>/dev/null | grep -qi running; then
       echo "#@orb list"; orb list -f json 2>/dev/null
@@ -1341,6 +1354,20 @@ run_action() {
       out=$(backup_sizes) ;;
     backup)
       out=$(backup_run "$t" 2>&1) || rc=$? ;;
+    upgrade)
+      if [ "$OS_KIND" = Darwin ]; then
+        b=$(command -v brew || ls /opt/homebrew/bin/brew /usr/local/bin/brew 2>/dev/null | head -1)
+        if [ -z "$b" ]; then out="Homebrew isn't installed"; rc=2; else out=$("$b" upgrade 2>&1) || rc=$?; fi
+      elif [ "$IS_ROOT" != 1 ]; then out="the agent isn't running as root, so it can't install updates"; rc=2
+      elif command -v apk >/dev/null 2>&1; then out=$( (apk update && apk upgrade) 2>&1) || rc=$?
+      elif command -v apt-get >/dev/null 2>&1; then out=$( (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade) 2>&1) || rc=$?
+      elif command -v dnf >/dev/null 2>&1; then out=$(dnf -y upgrade 2>&1) || rc=$?
+      elif command -v pacman >/dev/null 2>&1; then out=$(pacman -Syu --noconfirm 2>&1) || rc=$?
+      else out="no known package manager"; rc=2
+      fi
+      out=$(printf '%s' "$out" | tail -c 3500)
+      rm -f "$HOME/.arrakis-agent/updates"
+      inventory | post inventory >/dev/null 2>&1 ;;
     update-agent)
       result "$id" 0 "updating: the new agent reports within a few seconds"
       detach "sleep 1; curl -fsSL '$URL/api/hosts/install.sh?t=$TOKEN' | sh"

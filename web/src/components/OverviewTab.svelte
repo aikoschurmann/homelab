@@ -258,7 +258,7 @@
                 <span><b>{onlineHosts}</b> of {plural(1 + ($hosts || []).length, 'host')} online</span>
                 <span><b>{machineList.filter(m => m.state === 'running').length}</b> {machineList.filter(m => m.state === 'running').length === 1 ? 'machine' : 'machines'} running</span>
                 <span><b>{runningContainers}</b> {runningContainers === 1 ? 'container' : 'containers'}</span>
-                {#if updates && updates !== '0' && updates !== '-'}<span>{updates} updates available on {SN}</span>{/if}
+                {#if updates && updates !== '0' && updates !== '-'}<a class="up-link" href="#updates">{updates} updates available on {SN}</a>{/if}
             </div>
         </div>
         <div class="ui-head-actions">
@@ -520,4 +520,6 @@
         .lat-slow { padding: 12px 14px; }
         .lat-slow-k { flex-basis: 100%; }
     }
+    .up-link { color: inherit; text-decoration: none; }
+    .up-link:hover { color: var(--accent); text-decoration: underline; }
 </style>

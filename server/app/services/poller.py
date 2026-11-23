@@ -248,6 +248,8 @@ def start_all_pollers():
     threading.Thread(target=alerts_loop, daemon=True).start()
     from app.services import uptime
     uptime.start()
+    from app.api import updates
+    updates.start()
 
 def docker_events_loop():
     last_update = 0

@@ -955,12 +955,13 @@ GROUP_DOCS = {
     "Uptime": "Websites and services checked on a schedule, with certificate expiry.",
     "Hardware": "Temperatures, drive health (SMART) and UPS power, of this server and other hosts.",
     "Logs": "One search across every container's logs and the Mac apps' log files.",
+    "Updates": "Outdated packages on the Mac, its machines and other hosts, and applying them.",
     "Dashboard": "The dashboard's own data: stats stream, history, preferences and this catalog.",
     "Internal": "Plumbing for the agent, live streams and the terminal. Not meant to be called by hand.",
 }
 _BP_GROUP = {"vms": "Machines", "hosts": "Hosts", "compute": "Compute", "storage": "Storage", "tailscale": "Tailscale",
              "databases": "Databases", "backups": "Backups", "tmux": "Terminal", "services": "Services",
-             "uptime": "Uptime", "hardware": "Hardware", "logs": "Logs"}
+             "uptime": "Uptime", "hardware": "Hardware", "logs": "Logs", "updates": "Updates"}
 
 
 # Descriptions for routes whose view has no docstring (keyed "METHOD path").
@@ -993,6 +994,9 @@ ROUTE_DOCS = {
     "GET /api/hardware/{hid}": "The same for another host, from its agent's last inventory",
     "GET /api/logs/sources": "Machines and Mac apps whose logs can be searched",
     "GET /api/logs/search": "Search logs: q, since (15m 1h 6h 24h 7d), problems=1, source (mac or a machine), regex=1",
+    "GET /api/updates": "Outdated packages per computer, and update jobs in progress",
+    "POST /api/updates/check": "Look for updates again now (all, or one target)",
+    "POST /api/updates/{tid}/apply": "Upgrade a computer's packages (all, or the ones listed)",
     "GET /api/log_error": "Record a front-end error in the backend log",
     "POST /api/prefs": "Save dashboard preferences",
     "GET /api/stats_stream": "Live stats as Server-Sent Events",
