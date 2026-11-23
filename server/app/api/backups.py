@@ -22,36 +22,35 @@ def get_backups():
             with open(PLIST_PATH, 'rb') as f:
                 plist = plistlib.load(f)
         except OSError:
-            plist = {'Label': 'com.homelab.backup'}
-            day = 0
-            hour = 4
-            minute = 0
-            freq = 'daily'
-            
-            if 'StartInterval' in plist:
-                freq = 'hourly'
-                hour = plist['StartInterval'] // 3600
-            else:
-                interval = plist.get('StartCalendarInterval', {})
-                freq = 'weekly' if 'Weekday' in interval else 'daily'
-                day = interval.get('Weekday', 0)
-                hour = interval.get('Hour', 4)
-                minute = interval.get('Minute', 0)
-                
-            args = plist.get('ProgramArguments', [])
-            retention = 4
-            if len(args) > 1:
-                retention = int(args[1])
-            return jsonify({
-                "status": "success", 
-                "data": {
-                    "hour": hour,
-                    "minute": minute,
-                    "frequency": freq,
-                    "day": day,
-                    "retention": retention
-                }
-            })
+            plist = {}             # no schedule yet: the defaults below
+        day = 0
+        hour = 4
+        minute = 0
+        freq = 'daily'
+
+        if 'StartInterval' in plist:
+            freq = 'hourly'
+            hour = plist['StartInterval'] // 3600
+        else:
+            interval = plist.get('StartCalendarInterval', {})
+            freq = 'weekly' if 'Weekday' in interval else 'daily'
+            day = interval.get('Weekday', 0)
+            hour = interval.get('Hour', 4)
+            minute = interval.get('Minute', 0)
+
+        # [backup.sh, N] from older installs, [/bin/bash, backup.sh, N] now: N is the last argument
+        args = plist.get('ProgramArguments', [])
+        retention = int(args[-1]) if len(args) > 1 and str(args[-1]).isdigit() else 4
+        return jsonify({
+            "status": "success",
+            "data": {
+                "hour": hour,
+                "minute": minute,
+                "frequency": freq,
+                "day": day,
+                "retention": retention
+            }
+        })
     except Exception as e:
         log.error(f"Failed to get backups config: {e}")
         return jsonify({"status": "error", "message": str(e)})
