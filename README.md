@@ -13,8 +13,10 @@ git clone <this repo> ~/homelab && cd ~/homelab
 ./install.sh            # venv, web build, and a launchd (macOS) / systemd --user (Linux) service
 ```
 
-Then open `http://localhost:5050`. The first visit shows the setup screen, where you name the
-server, pick its port and, with OrbStack, choose its main machine.
+Then open `http://localhost:5050`. The first visit walks you through setup: the server's
+name, the look, a main OrbStack machine (or creating the first one) and Tailscale.
+On a server that's already set up, `/?setup` shows the same steps as a preview that
+saves nothing.
 
 You need Python 3.10+ and Node 20+. Optional tools light up their pages when they're installed:
 OrbStack, Tailscale, cloudflared, Docker, tmux.

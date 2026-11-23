@@ -62,6 +62,8 @@ def patch_server():
             return jsonify({"status": "error", "message": "Port must be between 1024 and 65535"}), 400
     vm = body.get("vm_name")
     restart = False
+    if vm == "":                                  # explicitly none (no OrbStack machine yet)
+        vm = None
     if vm:
         from app.core.config import VM_FILE, VM_NAME
         if vm not in _machines():
@@ -76,4 +78,15 @@ def patch_server():
                           setup_done=True if body.get("setup_done") else None)
     restart = restart or cfg["port"] != before["port"]
     log.info(f"server settings: name={cfg['name']} port={cfg['port']} setup_done={cfg['setup_done']}")
-    return jsonify({"status": "success", "data": {**_info(), "restart_needed": restart}})
+    # the VM name and port are read at startup: under launchd/systemd (KeepAlive / Restart=)
+    # exiting is a restart, as when the dashboard machine is renamed (vms.py)
+    restarting = restart and _supervised()
+    if restarting:
+        import signal, threading
+        threading.Timer(1.0, os.kill, (os.getpid(), signal.SIGTERM)).start()
+        log.info("restarting to apply the new port / main machine")
+    return jsonify({"status": "success", "data": {**_info(), "restart_needed": restart and not restarting, "restarting": restarting}})
+
+
+def _supervised():
+    return os.environ.get("XPC_SERVICE_NAME", "").startswith("com.homelab.") or bool(os.environ.get("INVOCATION_ID"))
