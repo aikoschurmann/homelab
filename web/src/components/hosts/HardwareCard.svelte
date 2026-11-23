@@ -36,10 +36,13 @@
         bad: d.health === 'failing' || d.health === 'warn',
         title: [d.name, d.bus, d.detail, d.health === 'unknown' && !hid && !hw.smartctl ? 'brew install smartmontools reads health over USB' : null].filter(Boolean).join('\n'),
     }));
-    $: power = hw?.power?.source ? (hw.power.ups?.length
-        ? hw.power.ups.map(u => ({ k: 'UPS', v: [hw.power.source === 'ups' ? 'On battery' : 'On mains', u.pct != null ? `${u.pct}%` : null, u.remaining ? `${u.remaining} left` : null].filter(Boolean).join(' · '), bad: hw.power.source === 'ups', title: u.name }))
-        : [{ k: 'Power', v: hw.power.source === 'battery' ? 'On battery' : 'Mains, no UPS' }]) : [];
-    $: right = [...drives, ...power];
+    // power goes in the footer: it is neither a temperature nor a drive
+    $: ups = hw?.power?.ups?.[0];
+    $: onBattery = hw?.power?.source === 'ups' || hw?.power?.source === 'battery';
+    $: power = !hw?.power?.source ? null : ups
+        ? [hw.power.source === 'ups' ? 'On UPS battery' : 'On mains power', `UPS ${ups.name}`, ups.pct != null ? `${ups.pct}% charged` : null, ups.remaining ? `${ups.remaining} left` : null].filter(Boolean).join(' · ')
+        : hw.power.source === 'battery' ? 'On battery power' : 'On mains power · no UPS connected';
+    $: right = drives;
     $: rows = Array.from({ length: Math.max(left.length, right.length) }, (_, i) => [left[i] || null, right[i] || null]);
     $: empty = hw && !t && !(hw.drives || []).length && !hw.power;
 </script>
@@ -51,6 +54,11 @@
     {:else if empty}
         <div class="ui-empty">{agentOld ? `Update ${name}'s agent (⋯ → Update agent) so it reports temperatures, drive health and UPS power.` : 'Nothing reported yet.'}</div>
     {:else}
-        <PairGrid {rows} heads={['Temperatures', 'Drives and power']} />
+        <PairGrid {rows} heads={['Temperatures', 'Drives']} />
+        {#if power}<div class="ui-card-foot"><span class:bad={onBattery}>{power}</span></div>{/if}
     {/if}
 </section>
+
+<style>
+    .bad { color: var(--red); font-weight: 500; }
+</style>
