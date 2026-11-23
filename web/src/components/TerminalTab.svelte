@@ -373,7 +373,6 @@
             <section class="ui-card">
                 <div class="ui-card-head grp">
                     <div><h2 class="ui-card-title">{g.where === 'mac' ? 'The Mac' : g.where}</h2><p class="ui-card-desc">{g.kind === 0 ? '' : groupKind(g.kind) + ' · '}{g.list.length} {g.list.length === 1 ? 'session' : 'sessions'}</p></div>
-                    <button class="ui-btn sm" on:click={() => newOn(g.where)} disabled={offline(g.where)}><Plus size={13} /> New session</button>
                 </div>
                 <div class="ui-tbl-wrap">
                     <table class="ui-tbl">

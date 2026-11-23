@@ -57,7 +57,7 @@
 </div>
 
 <style>
-    .drive { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; display: flex; flex-direction: column; min-width: 0; }
+    .drive { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 8px); display: flex; flex-direction: column; min-width: 0; }
     .dh { display: flex; align-items: center; gap: 12px; padding: 16px 18px 6px; }
     .ic { width: 38px; height: 38px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent); }
     .off .ic { background: var(--highlight-10); color: var(--text-secondary); }
@@ -72,6 +72,6 @@
     .bar { height: 8px; border-radius: 4px; background: var(--highlight-15); overflow: hidden; }
     .bar i { display: block; height: 100%; border-radius: 4px; background: var(--text-secondary); transition: width .4s ease; }
     .more { display: flex; justify-content: space-between; padding: 0 18px 10px; font-size: 12.5px; color: var(--text-secondary); }
-    .df { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 46px; padding: 0 18px; margin-top: auto; border-top: 1px solid var(--border); background: var(--highlight-3); border-radius: 0 0 10px 10px; }
+    .df { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 46px; padding: 0 18px; margin-top: auto; border-top: 1px solid var(--border); background: var(--highlight-3); border-radius: 0 0 var(--radius-card, 8px) var(--radius-card, 8px); }
     .note { font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>

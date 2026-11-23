@@ -335,7 +335,7 @@
         {:else if tab === 'jobs'}
             <div class="ui-listbar">
                 <label class="ui-search"><Search size={14} /><input placeholder="Search runs" bind:value={jq} /></label>
-                <div class="ui-seg">{#each JFILTERS as [k, l]}<button class:on={jstate === k} on:click={() => jstate = k}>{l}</button>{/each}</div>
+                <div class="ui-seg">{#each JFILTERS as [k, l]}<button class:on={jstate === k} on:click={() => jstate = k}>{l} <span class="n">{jobs.filter(j => jmatch(j, k)).length}</span></button>{/each}</div>
                 <span class="ui-count">{plural(shownJobs.length, 'run')}</span>
             </div>
             {#if jobs.length}
@@ -455,7 +455,7 @@
     .dlg .ui-hint { margin: 0; }
     .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; animation: pulse 1.6s ease-in-out infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-    .tail { padding: 12px 20px 14px; border-top: 1px solid var(--border); background: var(--highlight-3); border-radius: 0 0 10px 10px; font: 12.5px/1.65 'JetBrains Mono', monospace; color: var(--text-secondary); }
+    .tail { padding: 12px 20px 14px; border-top: 1px solid var(--border); background: var(--highlight-3); border-radius: 0 0 var(--radius-card, 8px) var(--radius-card, 8px); font: 12.5px/1.65 'JetBrains Mono', monospace; color: var(--text-secondary); }
     .tail div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tail .now { color: var(--text-primary); }
     .big { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; }
@@ -470,7 +470,7 @@
     .busy .bar { flex: 1; max-width: 120px; height: 8px; border-radius: 4px; background: var(--highlight-15); overflow: hidden; }
     .busy .bar i { display: block; height: 100%; border-radius: 4px; transition: width .4s ease; }
     .pad { margin: 0; padding: 0 20px 16px; }
-    .log { margin: 0; padding: 14px 20px; border-top: 1px solid var(--border); background: var(--highlight-3); font: 12.5px/1.55 'JetBrains Mono', monospace; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; max-height: 520px; overflow: auto; border-radius: 0 0 10px 10px; }
+    .log { margin: 0; padding: 14px 20px; border-top: 1px solid var(--border); background: var(--highlight-3); font: 12.5px/1.55 'JetBrains Mono', monospace; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; max-height: 520px; overflow: auto; border-radius: 0 0 var(--radius-card, 8px) var(--radius-card, 8px); }
     .log.small { max-height: 220px; }
     .cmd { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: var(--radius-card, 8px); background: var(--highlight-5); border: 1px solid var(--border); color: var(--text-secondary); }
     .cmd :global(svg) { flex-shrink: 0; margin-top: 4px; }
@@ -486,6 +486,6 @@
     .nf { display: flex; gap: 6px; padding: 0 20px 14px; max-width: 520px; }
     .nf .ui-input { flex: 1; min-width: 0; height: 30px; font-size: 12.5px; padding: 0 8px; }
     .code.full { height: calc(100vh - 330px); min-height: 380px; resize: none; }
-    .code { height: 560px; border-top: 1px solid var(--border); background: var(--highlight-3); border-radius: 0 0 10px 10px; overflow: hidden; resize: vertical; }
+    .code { height: 560px; border-top: 1px solid var(--border); background: var(--highlight-3); border-radius: 0 0 var(--radius-card, 8px) var(--radius-card, 8px); overflow: hidden; resize: vertical; }
 
 </style>

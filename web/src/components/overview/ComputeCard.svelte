@@ -58,7 +58,7 @@
     .more { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap; }
     .rows { border-top: 1px solid var(--border); }
     .row { display: grid; grid-template-columns: minmax(150px, 1.1fr) 130px minmax(120px, 1.5fr) 80px minmax(150px, 1.3fr) 16px; gap: 0 18px; align-items: center; width: 100%; padding: 12px 20px; border-bottom: 1px solid var(--border); text-align: left; color: var(--text-primary); font-size: 13px; cursor: pointer; box-sizing: border-box; }
-    .row:last-child { border-bottom: none; border-radius: 0 0 10px 10px; }
+    .row:last-child { border-bottom: none; border-radius: 0 0 var(--radius-card, 8px) var(--radius-card, 8px); }
     .row:not(.head):hover { background: var(--highlight-3); }
     .row:hover :global(.go) { color: var(--accent); }
     :global(.row .go) { color: var(--text-secondary); justify-self: end; }

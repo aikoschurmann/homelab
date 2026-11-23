@@ -35,6 +35,7 @@
         <slot name="status" />
     </div>
 
+    {#if meters.length}
     <div class="mc-meters">
         {#each meters as m}
             <div class="meter">
@@ -48,6 +49,7 @@
             </div>
         {/each}
     </div>
+    {/if}
 
     {#if foot}
         <div class="mc-foot">
@@ -64,7 +66,7 @@
 </div>
 
 <style>
-    .mcard { container-type: inline-size; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; display: flex; flex-direction: column; cursor: pointer; transition: border-color .12s, box-shadow .12s; text-align: left; min-width: 0; }
+    .mcard { container-type: inline-size; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 8px); display: flex; flex-direction: column; cursor: pointer; transition: border-color .12s, box-shadow .12s; text-align: left; min-width: 0; }
     .mcard:hover { border-color: var(--border-strong); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); }
     .mcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     .mcard.sel, .mcard.sel:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
@@ -89,7 +91,7 @@
     .meter .v small { font-weight: 400; color: var(--text-secondary); margin-left: 5px; font-size: 12px; }
     .ui-meter.segs { display: flex; }
     .ui-meter.segs i { border-radius: 0; }
-    .mc-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: nowrap; height: 46px; box-sizing: border-box; padding: 0 18px; overflow: hidden; border-top: 1px solid var(--border); background: var(--highlight-3); border-radius: 0 0 10px 10px; font-size: 12.5px; margin-top: auto; }
+    .mc-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: nowrap; height: 46px; box-sizing: border-box; padding: 0 18px; overflow: hidden; border-top: 1px solid var(--border); background: var(--highlight-3); border-radius: 0 0 var(--radius-card, 8px) var(--radius-card, 8px); font-size: 12.5px; margin-top: auto; }
     .chips { display: flex; gap: 6px; flex-wrap: nowrap; align-items: center; min-width: 0; white-space: nowrap; }
     .chip { height: 24px; padding: 0 9px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; color: var(--text-primary); cursor: pointer; }
     .chip:hover { border-color: var(--accent); color: var(--accent); }

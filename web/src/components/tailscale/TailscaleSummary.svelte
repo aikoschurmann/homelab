@@ -23,7 +23,8 @@
     const total = (d) => d.rx_bytes + d.tx_bytes;
     const nameOf = (d) => isShared(d) ? (d.user || 'Shared user') : displayName(d);
     // each bar gets one theme colour of its own, one shade per part
-    const ONLINE = 'var(--metric-cpu)', CONN = 'var(--metric-mem)', NET = 'var(--metric-net)';
+    // states (online, direct) take the status green the pills use; only traffic takes the network colour
+    const ONLINE = 'var(--green)', CONN = 'var(--green)', NET = 'var(--metric-net)';
     const SEG = [1, 0.7, 0.5];
     // traffic split by device, busiest first, the rest lumped together
     $: busiest = peers.filter(total).sort((a, b) => total(b) - total(a));

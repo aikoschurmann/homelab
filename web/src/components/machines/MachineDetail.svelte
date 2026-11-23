@@ -169,7 +169,8 @@
         <section class="ui-card">
             <div class="ui-card-head"><div><h2 class="ui-card-title">What runs here</h2><p class="ui-card-desc">{work ? `Read from inside ${m.name} ${agoS(work.at)}.` : running ? 'Reading…' : 'Shown while the machine runs.'}</p></div></div>
             {#if work}
-                <div class="lt">
+                <div class="lt" role="table">
+                    <div class="lt-r lt-h" role="row"><span></span><span>Part</span><span>Count</span><span></span></div>
                     {#each runRows as r}
                         <button class="lt-r" on:click={() => setTab(r.tab)}>
                             <span class="lt-ic"><svelte:component this={r.icon} size={15} /></span>
@@ -275,18 +276,20 @@
     .chart { padding-top: 8px; padding-bottom: 8px; }
     .spark { height: 36px; margin: 2px -4px -4px; }
     .lt { border-top: 1px solid var(--border); }
-    .lt-r { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto 16px; gap: 0 14px; align-items: center; width: 100%; padding: 12px 20px; border-bottom: 1px solid var(--border); text-align: left; font-size: 13px; color: var(--text-primary); cursor: pointer; box-sizing: border-box; }
+    .lt-r { display: grid; grid-template-columns: 30px minmax(0, 1fr) 150px 16px; gap: 0 16px; align-items: center; width: 100%; padding: 12px 20px; border-bottom: 1px solid var(--border); text-align: left; font-size: 13px; color: var(--text-primary); cursor: pointer; box-sizing: border-box; }
     .lt-r:last-child { border-bottom: none; }
-    .lt-r:hover { background: var(--highlight-3); }
+    .lt-r:not(.lt-h):hover { background: var(--highlight-3); }
     .lt-r:hover b, .lt-r:hover :global(.lt-go) { color: var(--accent); }
+    /* same look as the host's "What uses" header: quiet labels, every column left-aligned */
+    .lt-h { padding-top: 14px; padding-bottom: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); cursor: default; }
     .lt-ic { width: 30px; height: 30px; border-radius: var(--radius-card, 8px); display: flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent); }
     .lt-n { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
     .lt-n b { font-weight: 600; }
     .lt-n small { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .lt-v { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .lt-v { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .lt-r :global(.lt-go) { color: var(--text-secondary); }
     a.ui-btn { text-decoration: none; }
     @media (max-width: 1000px) { .cols { grid-template-columns: 1fr; } }
     /* phone: cards inset 14px, so this lines up with the card's header */
-    @media (max-width: 768px) { .lt-r, .dash-note { padding-left: 14px; padding-right: 14px; } }
+    @media (max-width: 768px) { .lt-r, .dash-note { padding-left: 14px; padding-right: 14px; } .lt-r { grid-template-columns: 30px minmax(0, 1fr) 64px 14px; gap: 0 10px; } }
 </style>

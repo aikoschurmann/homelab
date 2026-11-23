@@ -117,7 +117,7 @@
             <div><div class="ui-label">Name</div><div class="ui-hint">Lowercase, digits and dashes</div></div>
             <div class="ctl col">
                 <form class="ctl" on:submit|preventDefault={() => nameOk && rename()}>
-                    <input class="ui-input mono" bind:value={newName} maxlength="63" spellcheck="false" />
+                    <input class="ui-input" bind:value={newName} maxlength="63" spellcheck="false" />
                     {#if newName !== mname}<button class="ui-btn sm primary" disabled={!nameOk || renaming}>{#if renaming}<Loader2 size={13} class="ui-spin" />{/if}Rename</button>{/if}
                 </form>
                 {#if newName !== mname && isDash}<div class="ui-hint">This is the dashboard's machine; the dashboard restarts by itself to follow the new name.</div>{/if}
@@ -257,9 +257,9 @@
 </section>
 
 {#if dirty || needsRestart || error}
-    <div class="savebar">
+    <div class="ui-savebar">
         {#if dirty || error}
-            <span class={error ? 'err' : ''}>{error || 'Unsaved changes'}</span>
+            <span class:err={error}>{error || 'Unsaved changes'}</span>
             <span class="ui-btns">
                 <button class="ui-btn sm" on:click={reset}>Reset</button>
                 <button class="ui-btn sm primary" disabled={saving} on:click={save}>{#if saving}<Loader2 size={13} class="ui-spin" />{/if}Save</button>
@@ -278,7 +278,7 @@
     .rows { border-top: 1px solid var(--border); }
     .ctl { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
     .ctl.col { flex-direction: column; align-items: flex-start; gap: 8px; }
-    .ctl .ui-input { width: 240px; max-width: 100%; }
+    .ctl .ui-input { width: 320px; max-width: 100%; }
     .bad { color: var(--red); }
     /* same widths in every resource row, whatever the unit */
     .res .ui-seg button { width: 84px; text-align: center; padding: 0; }
@@ -298,6 +298,4 @@
     .ui-select { min-width: 240px; }
     .danger-body { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--border); }
     .danger-body .ui-field { flex: 0 1 280px; }
-    .savebar { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px 10px 18px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgba(0,0,0,.25); font-size: 13px; color: var(--text-secondary); }
-    .savebar .err { color: var(--red); }
 </style>

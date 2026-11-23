@@ -6,7 +6,7 @@
     // · Apps (on macOS itself) · Metrics (history charts).
     import { onMount } from 'svelte';
     import WebLinkButton from '../ui/WebLinkButton.svelte';
-    import { Search, Layers, AppWindow, Plus, LayoutGrid, List, Laptop, Terminal, ArrowRight, ChevronRight, HardDrive, Lock, SquareTerminal } from 'lucide-svelte';
+    import { Search, Layers, AppWindow, LayoutGrid, List, Laptop, Terminal, ArrowRight, ChevronRight, HardDrive, Lock, SquareTerminal } from 'lucide-svelte';
     import { disks, disksError, fetchDisks, ejectDisk, mountVolume, unmountVolume, storageTotals } from '../../lib/storage.js';
     import { fmtDisk } from '../../lib/hosts.js';
     import { stats, machines, machineUsage, gbFromMib, visible } from '../../lib/stores.js';
@@ -150,7 +150,6 @@
         </div>
         <div class="ui-head-actions">
             <button class="ui-btn" on:click={() => openShell('mac')} title="A tmux session named shell on the Mac"><SquareTerminal size={14} /> Shell</button>
-            <a class="ui-btn primary" href={href.newMachine}><Plus size={15} /> Create machine</a>
             <ActionMenu items={menuItems} label="More actions" />
         </div>
     </div>
@@ -221,9 +220,9 @@
         <div class="ui-listbar">
             <label class="ui-search"><Search size={14} /><input placeholder="Search apps" bind:value={q} /></label>
             <div class="ui-seg">
-                <button class:on={state === 'all'} on:click={() => state = 'all'}>All</button>
-                <button class:on={state === 'running'} on:click={() => state = 'running'}>Running</button>
-                <button class:on={state === 'stopped'} on:click={() => state = 'stopped'}>Stopped</button>
+                <button class:on={state === 'all'} on:click={() => state = 'all'}>All <span class="n">{apps.length}</span></button>
+                <button class:on={state === 'running'} on:click={() => state = 'running'}>Running <span class="n">{apps.filter(s => s.status === 'running').length}</span></button>
+                <button class:on={state === 'stopped'} on:click={() => state = 'stopped'}>Stopped <span class="n">{apps.filter(s => s.status !== 'running').length}</span></button>
             </div>
             <span class="ui-count">{plural(shownApps.length, 'app')}</span>
             <div class="ui-seg view" role="group" aria-label="View">
@@ -232,7 +231,6 @@
             </div>
         </div>
 
-            <p class="ui-hint lead">Apps and daemons on macOS itself, outside the VM.</p>
             {#if view === 'grid'}
                 <div class="ui-cardgrid">
                     {#each shownApps as s (s.key)}
@@ -243,8 +241,8 @@
                                 { k: 'Memory', p: run ? pct((s.mem_mb || 0) / 1024, totalMem) : 0, color: 'var(--metric-mem)', v: run ? fmtMb(s.mem_mb) : '—', of: `of ${totalMem.toFixed(0)} GB` },
                                 { k: 'Up', v: run ? fmtUp(s.uptime_seconds) : '—', of: run ? 'since start' : '' },
                             ]}
-                            note={run ? 'Running' : 'Not running'}>
-                            <svelte:fragment slot="status"><WebLinkButton svc={s} /></svelte:fragment>
+                            foot={false}>
+                            <svelte:fragment slot="status"><StatusPill state={run ? 'running' : 'stopped'} /><WebLinkButton svc={s} /></svelte:fragment>
                         </ResourceCard>
                     {:else}<div class="ui-card ui-empty">No apps match.</div>{/each}
                 </div>
@@ -325,7 +323,6 @@
     .icon.on { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
     .id .ui-meta { margin-top: 6px; }
     h1 .ui-tag { font-size: 12px; font-weight: 500; }
-    a.ui-btn { text-decoration: none; }
     .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
     .big { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; }
     .chart { padding-top: 8px; padding-bottom: 8px; }
@@ -361,7 +358,6 @@
         .use-bar { padding: 14px; flex-wrap: wrap; }
         .ub-k { white-space: normal; }
     }
-    .lead { margin: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
     /* machine and app tables, as on the OrbStack VM page */
     .nm-cell { display: flex; align-items: center; gap: 8px; }

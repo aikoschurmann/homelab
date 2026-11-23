@@ -29,6 +29,7 @@
 
     // ---- this server: name and port (server.json) ------------------------------------------
     let srvName = server.name, srvPort = server.port, srvSaving = false;
+    $: srvDirty = srvName.trim() !== server.name || Number(srvPort) !== server.port;
     async function saveSrv() {
         srvSaving = true;
         try {
@@ -271,7 +272,7 @@
 
     {#if tab === 'general'}
     <section class="ui-card">
-        <div class="ui-card-head"><div><h2 class="ui-card-title">This server</h2><p class="ui-card-desc">Kept in <span class="ui-mono">{server.home}/server.json</span>.</p></div></div>
+        <div class="ui-card-head"><div><h2 class="ui-card-title">This server</h2><p class="ui-card-desc">{server.os} · {server.hostname} · kept in <span class="ui-mono">{server.home}/server.json</span>.</p></div></div>
         <div class="rows">
             <div class="ui-form-row">
                 <div><div class="ui-label">Name</div><div class="ui-hint">What the dashboard calls this computer</div></div>
@@ -279,12 +280,14 @@
             </div>
             <div class="ui-form-row">
                 <div><div class="ui-label">Port</div><div class="ui-hint">Applies after a restart{#if server.port_active && server.port_active !== server.port} · running on {server.port_active}{/if}</div></div>
-                <input class="ui-input srv-port" type="number" min="1024" max="65535" bind:value={srvPort} />
+                <input class="ui-input mono srv-port" type="number" min="1024" max="65535" bind:value={srvPort} />
             </div>
         </div>
-        <div class="ui-card-foot"><span>{server.os} · {server.hostname}</span>
-            <span class="ui-btns"><button class="ui-btn sm primary" disabled={srvSaving || !srvName.trim() || (srvName.trim() === server.name && Number(srvPort) === server.port)} on:click={saveSrv}>{srvSaving ? 'Saving…' : 'Save'}</button></span>
-        </div>
+        {#if srvDirty}
+            <div class="ui-card-foot"><span>Unsaved changes</span>
+                <span class="ui-btns"><button class="ui-btn sm" on:click={() => { srvName = server.name; srvPort = server.port; }}>Reset</button><button class="ui-btn sm primary" disabled={srvSaving || !srvName.trim()} on:click={saveSrv}>{srvSaving ? 'Saving…' : 'Save'}</button></span>
+            </div>
+        {/if}
     </section>
 
     <section class="ui-card">
@@ -628,6 +631,6 @@
         .pl-row :global(.pl-go) { grid-column: 2; grid-row: 1 / span 2; }
     }
     kbd { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 0 5px; border: 1px solid var(--border-strong); border-radius: 4px; }
-    .srv-name { max-width: 320px; }
-    .srv-port { max-width: 120px; }
+    .ui-form-row .srv-name { max-width: 320px; }
+    .ui-form-row .srv-port { max-width: 96px; }
 </style>

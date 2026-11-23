@@ -202,8 +202,8 @@
     </section>
 
     {#if dirty || error}
-        <div class="savebar">
-            <span class={error ? 'err' : ''}>{error || (running ? 'Unsaved changes' : `Start ${m.name} to save`)}</span>
+        <div class="ui-savebar">
+            <span class:err={error}>{error || (running ? 'Unsaved changes' : `Start ${m.name} to save`)}</span>
             <span class="ui-btns">
                 <button class="ui-btn sm" on:click={() => { p = structuredClone(k.perms); error = ''; }}>Reset</button>
                 <button class="ui-btn sm primary" disabled={!running || saving} on:click={save}>{#if saving}<Loader2 size={13} class="ui-spin" />{/if}Save</button>
@@ -232,6 +232,4 @@
         .phead { flex-direction: column; align-items: stretch; gap: 12px; }
         .who .ui-mono { overflow-wrap: anywhere; }
     }
-    .savebar { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px 10px 18px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgba(0,0,0,.25); font-size: 13px; color: var(--text-secondary); }
-    .savebar .err { color: var(--red); }
 </style>

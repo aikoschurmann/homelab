@@ -142,9 +142,9 @@
     <div class="ui-listbar">
         <label class="ui-search"><Search size={14} /><input placeholder="Search name, OS or IP" bind:value={q} /></label>
         <div class="ui-seg">
-            <button class:on={filter === 'all'} on:click={() => filter = 'all'}>All</button>
-            <button class:on={filter === 'online'} on:click={() => filter = 'online'}>Online</button>
-            <button class:on={filter === 'offline'} on:click={() => filter = 'offline'}>Offline</button>
+            <button class:on={filter === 'all'} on:click={() => filter = 'all'}>All <span class="n">{list.length}</span></button>
+            <button class:on={filter === 'online'} on:click={() => filter = 'online'}>Online <span class="n">{list.filter(h => h.online).length}</span></button>
+            <button class:on={filter === 'offline'} on:click={() => filter = 'offline'}>Offline <span class="n">{list.filter(h => !h.online).length}</span></button>
         </div>
         <span class="ui-count">{plural(shown.length, 'host')}</span>
         <div class="ui-seg view" role="group" aria-label="View">

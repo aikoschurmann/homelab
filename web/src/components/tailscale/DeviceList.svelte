@@ -201,8 +201,6 @@
     .pth.relay { color: var(--amber); }
 
 
-    .n { font-size: 11.5px; color: var(--text-secondary); margin-left: 3px; font-variant-numeric: tabular-nums; }
-    .ui-seg button.on .n { color: var(--accent); }
     .dev { display: flex; align-items: center; gap: 12px; min-width: 0; }
     .ic { width: 32px; height: 32px; border-radius: var(--radius-card, 8px); flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--highlight-10); color: var(--text-secondary); }
     .ic.on { background: var(--accent-soft); color: var(--accent); }
@@ -214,8 +212,8 @@
     .nm :global(.ui-tag) { flex-shrink: 0; white-space: nowrap; }
     tr.click:hover .nm-t { text-decoration: underline; }
     .dev-main small { font-size: 12px; color: var(--text-secondary); }
-    .mlink { color: inherit; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; }
-    .mlink:hover { color: var(--accent); }
+    .mlink { color: var(--accent); text-decoration: none; font-weight: 500; }
+    .mlink:hover { text-decoration: underline; }
     tr.off .nm { color: var(--text-primary); }
     tr.off td { color: var(--text-secondary); }
     tr.off .ic { opacity: 0.7; }

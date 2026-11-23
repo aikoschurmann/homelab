@@ -107,7 +107,7 @@
         <div class="ui-stat">
             <span class="ui-stat-label">Tunnels</span>
             <span class="ui-stat-value">{active}<small>of {live.length} active</small></span>
-            <div class="ui-segbar"><i style="width: {active / Math.max(1, live.length) * 100}%; background: var(--metric-net)"></i><i style="width: {(live.length - active) / Math.max(1, live.length) * 100}%; background: var(--metric-net); opacity: 0.4"></i></div>
+            <div class="ui-segbar"><i style="width: {active / Math.max(1, live.length) * 100}%; background: var(--green)"></i><i style="width: {(live.length - active) / Math.max(1, live.length) * 100}%; background: var(--green); opacity: 0.4"></i></div>
             <span class="ui-stat-sub">{live.length - active} inactive · {counts.deleted} recently deleted</span>
         </div>
         <div class="ui-stat">
@@ -130,7 +130,7 @@
         <div class="ui-listbar">
             <label class="ui-search"><Search size={14} /><input placeholder="Search name, content or comment" bind:value={q} /></label>
             <div class="ui-seg">
-                {#each types as t}<button class:on={type === t} on:click={() => type = t}>{t === 'all' ? 'All' : t}</button>{/each}
+                {#each types as t}<button class:on={type === t} on:click={() => type = t}>{t === 'all' ? 'All' : t} <span class="n">{t === 'all' ? records.length : records.filter(r => r.type === t).length}</span></button>{/each}
             </div>
             <span class="ui-count">{shownRecords.length} {shownRecords.length === 1 ? 'record' : 'records'}</span>
         </div>
@@ -215,7 +215,8 @@
 <style>
     .hub { display: grid; grid-template-columns: minmax(240px, 1fr) 2fr; align-items: stretch; }
     .hub-id { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-right: 1px solid var(--border); }
-    .hub-ic { width: 40px; height: 40px; border-radius: 10px; background: var(--text-primary); color: var(--surface); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    /* same tinted icon as the host and machine cards */
+    .hub-ic { width: 38px; height: 38px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
     .hub-name { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; color: var(--text-primary); }
     .hub-sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; }
     .hub-facts { display: grid; grid-template-columns: auto auto auto; margin: 0; }
@@ -231,8 +232,6 @@
     .info:hover, .info:focus-visible { opacity: 1; }
     .info-pop { position: absolute; left: calc(-10px + var(--dx, 0px)); max-width: calc(100vw - 24px); top: calc(100% + 8px); width: 280px; padding: 8px 10px; border-radius: 6px; background: var(--text-primary); color: var(--surface); font-size: 12px; font-weight: 400; line-height: 1.45; text-align: left; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); display: none; z-index: 5; }
     .info:hover .info-pop, .info:focus-visible .info-pop, :global(.info.open) .info-pop { display: block; }
-    .n { font-size: 11.5px; color: var(--text-secondary); margin-left: 3px; font-variant-numeric: tabular-nums; }
-    .ui-seg button.on .n { color: var(--accent); }
 
     /* tunnels */
     .tun, .dns { table-layout: fixed; }
@@ -250,8 +249,8 @@
     tr.click:hover .nm-t { text-decoration: underline; }
     tr.off .nm { color: var(--text-primary); }
     tr.off .ic { opacity: 0.7; }
-    .mlink { color: inherit; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px; }
-    .mlink:hover { color: var(--accent); }
+    .mlink { color: var(--accent); text-decoration: none; font-weight: 500; }
+    .mlink:hover { text-decoration: underline; }
     .stp { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
     .stp b { font-weight: 500; font-variant-numeric: tabular-nums; }
     .stp small { font-size: 11.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }

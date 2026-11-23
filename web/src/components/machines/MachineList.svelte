@@ -1,7 +1,7 @@
 <script>
     import { SN } from '../../lib/server.js';
     import { onMount } from 'svelte';
-    import { Plus, Search, Play, Square, RotateCw, Trash2, Settings2, Loader2, X, ExternalLink, Network, Layers, Server, LayoutGrid, List } from 'lucide-svelte';
+    import { Plus, Search, Play, Square, RotateCw, Trash2, Settings2, Loader2, X, ExternalLink, Network, Layers, LayoutGrid, List } from 'lucide-svelte';
     import { gbFromMib, fetchMachines, fetchHostVms, visible } from '../../lib/stores.js';
     import { vmRef, vmBase } from '../../lib/vmref.js';
     import { api, busy, machineAction, imageLabel, tsLabel, fmtBytes } from '../../lib/machines.js';
@@ -141,9 +141,9 @@
     <div class="list-bar">
         <label class="ui-search"><Search size={14} /><input placeholder="Search name, IP or distro" bind:value={q} /></label>
         <div class="ui-seg">
-            <button class:on={stateFilter === 'all'} on:click={() => stateFilter = 'all'}>All</button>
-            <button class:on={stateFilter === 'running'} on:click={() => stateFilter = 'running'}>Running</button>
-            <button class:on={stateFilter === 'stopped'} on:click={() => stateFilter = 'stopped'}>Stopped</button>
+            <button class:on={stateFilter === 'all'} on:click={() => stateFilter = 'all'}>All <span class="n">{list.length}</span></button>
+            <button class:on={stateFilter === 'running'} on:click={() => stateFilter = 'running'}>Running <span class="n">{list.filter(running).length}</span></button>
+            <button class:on={stateFilter === 'stopped'} on:click={() => stateFilter = 'stopped'}>Stopped <span class="n">{list.filter(m => !running(m)).length}</span></button>
         </div>
         <span class="ui-count">{shown.length} {shown.length === 1 ? 'machine' : 'machines'}</span>
         {#if embedded}<button class="ui-btn primary" on:click={create}><Plus size={14} /> Create machine</button>{/if}
@@ -154,16 +154,14 @@
     </div>
 
     {#if view === 'grid'}
-    <div class="grid">
+    <div class="ui-cardgrid">
         {#each orphanJobs as [name, job] (name)}
-            <div class="mcard pending">
-                <div class="mc-head">
-                    <span class="mc-icon"><Server size={18} /></span>
-                    <div class="mc-title"><span class="mc-name plain">{name}</span><span class="sub">{job.state === 'creating' ? 'Downloading the image and setting it up…' : (job.message || 'unknown error')}</span></div>
+            <ResourceCard plain name={name} sub={job.state === 'creating' ? 'Downloading the image and setting it up…' : (job.message || 'unknown error')} on={false} foot={false}>
+                <svelte:fragment slot="status">
                     <StatusPill state={job.state === 'creating' ? 'creating' : 'error'} label={job.state === 'creating' ? 'Creating' : 'Failed'} />
                     {#if job.state !== 'creating'}<button class="ui-btn sm icon" title="Dismiss" on:click={() => dismissJob(name)}><X size={14} /></button>{/if}
-                </div>
-            </div>
+                </svelte:fragment>
+            </ResourceCard>
         {/each}
         {#each shown as m (m.name)}
             {@const b = $busy[R(m)]}
@@ -179,7 +177,7 @@
                     ...(s?.runs?.containers ? [{ label: plural(s.runs.containers, 'container'), onClick: () => open(m.name, 'workloads') }] : []),
                     ...(s?.runs?.services ? [{ label: plural(s.runs.services, 'service'), onClick: () => open(m.name, 'workloads') }] : []),
                 ]}
-                note={!running(m) ? 'Stopped' : s?.runs ? 'Nothing extra running' : ''}
+                note={running(m) && s?.runs ? 'Nothing extra running' : ''}
                 lan={running(m) ? m.ip : ''} ts={m.tailscale?.state === 'running' ? m.tailscale.ip : ''} tsTitle="Tailscale {m.tailscale?.dns || ''}">
                 <svelte:fragment slot="status">
                     {#if b}<StatusPill state="starting" label={BUSY[b]} />
@@ -283,34 +281,6 @@
     .list-bar .ui-count { margin-left: auto; font-size: 13px; color: var(--text-secondary); }
     .ui-seg.view button { padding: 0 9px; display: flex; align-items: center; }
 
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
-    .mcard { container-type: inline-size; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; display: flex; flex-direction: column; cursor: pointer; transition: border-color .12s, box-shadow .12s; text-align: left; }
-    .mcard:hover { border-color: var(--border-strong); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06); }
-    .mcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .mcard.pending { cursor: default; }
-    .mc-head { display: flex; align-items: center; gap: 12px; padding: 16px 16px 14px 18px; }
-    .mc-icon { width: 38px; height: 38px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--highlight-10); color: var(--text-secondary); }
-    .mc-icon.on { background: var(--accent-soft); color: var(--accent); }
-    .mc-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-    .mc-name { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--accent); }
-    .mc-name.plain { color: var(--text-primary); }
-    .mcard:hover .mc-name:not(.plain) { text-decoration: underline; }
-    .mc-meters { display: flex; flex-direction: column; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--border); }
-    .meter { display: grid; grid-template-columns: 64px 1fr 150px; align-items: center; gap: 12px; }
-    .meter .k { font-size: 12.5px; color: var(--text-secondary); }
-    .meter .v { font-size: 13px; font-weight: 500; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .meter .v.wide { grid-column: 2 / -1; }
-    .meter .v small { font-weight: 400; color: var(--text-secondary); margin-left: 5px; font-size: 12px; }
-    .mc-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: nowrap; height: 46px; box-sizing: border-box; padding: 0 18px; overflow: hidden; border-top: 1px solid var(--border); background: var(--highlight-3); border-radius: 0 0 10px 10px; font-size: 12.5px; margin-top: auto; }
-    .chips { display: flex; gap: 6px; flex-wrap: nowrap; align-items: center; min-width: 0; white-space: nowrap; }
-    .chip { height: 24px; padding: 0 9px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; color: var(--text-primary); cursor: pointer; }
-    .chip:hover { border-color: var(--accent); color: var(--accent); }
-    .addr { display: flex; gap: 12px; align-items: center; color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; }
-    /* one footer height for every card: narrow cards drop addresses rather than wrap */
-    @container (max-width: 520px) { .addr .lan { display: none; } }
-    @container (max-width: 400px) { .addr { display: none; } }
-    .addr .ui-mono { font-size: 12px; }
-    .mcard.off .mc-meters { opacity: 0.55; }
     .nm-cell { display: flex; align-items: center; gap: 8px; }
     .nm { font-weight: 600; color: var(--accent); }
     .nm.plain { color: var(--text-primary); }
@@ -337,8 +307,6 @@
         .summary { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 640px) {
-        .grid { grid-template-columns: 1fr; }
-        .meter { grid-template-columns: 56px 1fr 120px; }
         .summary > :nth-child(2), .summary > :nth-child(3) { grid-column: 1 / -1; }
         .summary > :nth-child(2), .summary > :nth-child(3) { order: 1; }
         .ui-head-actions { width: 100%; }

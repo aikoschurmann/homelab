@@ -6,7 +6,7 @@
     // Overview (sparkline tiles, what uses it, health, details) · Workloads · OrbStack VM and
     // Storage (when its agent reports them) · Metrics · Settings.
     import { onMount } from 'svelte';
-    import { ChevronRight, Trash2, Terminal, Power, Download, Play, Square, RotateCw, LayoutGrid, List, Search, AppWindow, Plus, SquareTerminal } from 'lucide-svelte';
+    import { ChevronRight, Trash2, Terminal, Power, Download, Play, Square, RotateCw, LayoutGrid, List, Search, AppWindow, SquareTerminal } from 'lucide-svelte';
     import { visible, gbFromMib } from '../../lib/stores.js';
     import { imageLabel } from '../../lib/machines.js';
     import { tailnet, fetchTailnet } from '../../lib/tailscale.js';
@@ -242,7 +242,6 @@
         </div>
         <div class="ui-head-actions">
             {#if h.online}<button class="ui-btn" on:click={() => openShell(h.id)} title="A tmux session named shell on this host, over SSH"><SquareTerminal size={14} /> Shell</button>{/if}
-            {#if managed}<a class="ui-btn primary" href={href.newMachineOn(h.id)}><Plus size={15} /> Create machine</a>{/if}
             <ActionMenu items={menuItems} label="More actions" />
         </div>
     </div>
@@ -336,13 +335,12 @@
         {#if macApps}
             <div class="ui-listbar">
                 <label class="ui-search"><Search size={14} /><input placeholder="Search apps" bind:value={aq} /></label>
-                <span class="ui-count">{plural(shownApps.length, 'app')}</span>
+                <span class="ui-count" title="Apps and programs running on {h.name}, outside OrbStack. macOS's own processes are left out.">{plural(shownApps.length, 'app')}{w ? ` · seen ${ago(w.at)}` : ''}</span>
                 <div class="ui-seg view" role="group" aria-label="View">
                     <button class:on={view === 'grid'} on:click={() => setView('grid')} title="Cards" aria-label="Cards"><LayoutGrid size={14} /></button>
                     <button class:on={view === 'table'} on:click={() => setView('table')} title="Table" aria-label="Table"><List size={14} /></button>
                 </div>
             </div>
-            <p class="ui-hint" style="margin: 0">Apps and programs running on {h.name}, outside OrbStack, as its agent saw them {w ? ago(w.at) : ''}. macOS's own processes are left out.</p>
             {#if view === 'grid'}
                 <div class="ui-cardgrid">
                     {#each shownApps as a (a.id)}
@@ -352,7 +350,9 @@
                                 { k: 'Memory', p: pct(a.mem_mb / 1024, totalGb), color: 'var(--metric-mem)', v: fmtMb(a.mem_mb), of: `of ${totalGb.toFixed(0)} GB` },
                                 { k: 'Up', v: fmtUp(a.uptime_seconds), of: 'since start' },
                             ]}
-                            note="Running" />
+                            foot={false}>
+                            <svelte:fragment slot="status"><StatusPill state="running" /></svelte:fragment>
+                        </ResourceCard>
                     {:else}<div class="ui-card ui-empty">No apps match.</div>{/each}
                 </div>
             {:else}
@@ -417,7 +417,7 @@
             <div class="ui-card ui-empty">OrbStack is installed on {h.name} but isn't running. Open it there and its machines show up here within a minute.</div>
         {:else if vms}
             <div class="ui-listbar">
-                <span class="ui-count">{vmRunning} of {plural(vmList.length, 'machine')} running{vms.pool ? ` · VM pool ${vms.pool.cpu} cores, ${gbFromMib(vms.pool.memory_mib)}` : ''}</span>
+                <span class="ui-count" title="{h.name}'s agent reports every minute and right after you start or stop one.">{vmRunning} of {plural(vmList.length, 'machine')} running{vms.pool ? ` · VM pool ${vms.pool.cpu} cores, ${gbFromMib(vms.pool.memory_mib)}` : ''}{vms.at ? ` · seen ${ago(vms.at)}` : ''}</span>
                 <div class="ui-seg view" role="group" aria-label="View">
                     <button class:on={view === 'grid'} on:click={() => setView('grid')} title="Cards" aria-label="Cards"><LayoutGrid size={14} /></button>
                     <button class:on={view === 'table'} on:click={() => setView('table')} title="Table" aria-label="Table"><List size={14} /></button>
@@ -434,7 +434,7 @@
                                 { k: 'Memory', v: limitMem(m), of: m.memory_mib ? 'limit' : `pool of ${gbFromMib(vms.pool?.memory_mib || 0)}` },
                                 { k: 'User', v: m.username || '—', of: '' },
                             ]}
-                            note={on ? 'Running' : 'Stopped'}>
+                            foot={false}>
                             <svelte:fragment slot="status">
                                 <StatusPill state={m.state} />
                                 {#if vmMenu(m).length}<ActionMenu items={vmMenu(m)} label="Actions for {m.name}" />{/if}
@@ -459,7 +459,6 @@
                     </tbody>
                 </table></div></section>
             {/if}
-            <p class="ui-hint" style="margin: 0">As {h.name}'s agent reported them {ago(vms.at)}; it reports every minute and right after you start or stop one.</p>
         {:else}<div class="ui-dim">Reading machines…</div>{/if}
 
     {:else if tab === 'storage'}
