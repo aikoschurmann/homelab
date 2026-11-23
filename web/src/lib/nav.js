@@ -21,7 +21,7 @@ export const NAV = [
         // parent: the sidebar folds these into one entry; pages: its tabs show under it (filters stay on the page)
         { tab: 'Tailscale', icon: Network, parent: 'Network', pages: true, children: [page('', 'Devices'), page('ping', 'Ping'), page('people', 'People'), page('server', 'This server')] },
         { tab: 'Cloudflare', icon: Cloud, parent: 'Network', pages: true, children: [page('', 'Tunnels'), page('dns', 'DNS records')] },
-        { tab: 'Tools', label: 'Network tools', icon: Gauge, parent: 'Network', pages: true, children: [page('', 'Checks'), page('uptime', 'Uptime'), page('speed', 'Speed test'), page('computers', 'Computers'), page('api', 'API health')] },
+        { tab: 'Tools', label: 'Network tools', icon: Gauge, parent: 'Network', pages: true, children: [page('', 'Checks'), page('uptime', 'Uptime'), page('pihole', 'Pi-hole'), page('speed', 'Speed test'), page('computers', 'Computers'), page('api', 'API health')] },
         // sub: its children show in the sidebar too (other items keep theirs on the page)
         { tab: 'Databases', icon: Database, sub: true, children: [page('', 'All databases')] },
         { tab: 'Backups', icon: Archive, sub: true, children: [page('', 'Snapshots'), page('coverage', "What's covered"), page('runs', 'Runs')] },
