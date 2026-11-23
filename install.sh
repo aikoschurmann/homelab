@@ -25,18 +25,23 @@ say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
 need() { command -v "$1" >/dev/null || { echo "Needs $1 ($2)" >&2; exit 1; }; }
 [ "$(uname)" = Darwin ] && export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-need python3 "Python 3.10 or newer"
+# the newest Python 3.10+ around (Homebrew often has only python3.X, macOS's python3 is 3.9)
+PY=""
+for c in ${PYTHON:-} python3.14 python3.13 python3.12 python3.11 python3.10 python3; do
+    command -v "$c" >/dev/null && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 10))' 2>/dev/null && { PY=$c; break; }
+done
+[ -n "$PY" ] || { echo "Needs Python 3.10 or newer (set PYTHON=/path/to/python3)" >&2; exit 1; }
 need npm "Node.js 20 or newer"
-python3 -c 'import sys; sys.exit(sys.version_info < (3, 10))' || { echo "Python 3.10+ needed, found $(python3 -V)" >&2; exit 1; }
 
 say "Python environment (server/venv)"
-[ -x server/venv/bin/python ] || python3 -m venv server/venv
 # Homebrew's Python can be built against a newer expat than macOS ships; point it at brew's
+# (before the venv: creating one runs pip, which needs pyexpat)
 EXTRA_ENV=""
-if ! server/venv/bin/python -c 'import pyexpat' 2>/dev/null && [ -d /opt/homebrew/opt/expat/lib ]; then
+if ! "$PY" -c 'import pyexpat' 2>/dev/null && [ -d /opt/homebrew/opt/expat/lib ]; then
     export DYLD_LIBRARY_PATH=/opt/homebrew/opt/expat/lib
     EXTRA_ENV="DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH"
 fi
+[ -x server/venv/bin/python ] || "$PY" -m venv server/venv
 server/venv/bin/python -m pip install -q --upgrade pip
 server/venv/bin/python -m pip install -q -r server/requirements.txt
 
