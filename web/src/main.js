@@ -7,8 +7,10 @@ import './motion.css'
 import { loadServer } from './lib/server.js'
 
 // Who this server is comes first: modules read its name when they load, so the app is
-// imported only after it's known. A server that hasn't been set up shows the setup screen.
+// imported only after it's known. A server that hasn't been set up shows the setup screen
+// (so does /?setup, to run it again).
 const server = await loadServer()
-const { default: Root } = server.setup_done ? await import('./App.svelte') : await import('./components/Setup.svelte')
+const setup = !server.setup_done || new URLSearchParams(location.search).has('setup')
+const { default: Root } = setup ? await import('./components/Setup.svelte') : await import('./App.svelte')
 
 export default mount(Root, { target: document.getElementById('app') })

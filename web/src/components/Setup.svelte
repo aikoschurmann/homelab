@@ -26,7 +26,7 @@
         try {
             const d = await saveServer({ name, port: Number(port), vm_name: vm || null, setup_done: true });
             if (d.restart_needed) restart = true;
-            else location.reload();
+            else location.href = '/';      // drops ?setup, if it was opened that way
         } catch (e) { error = e.message; }
         saving = false;
     }
