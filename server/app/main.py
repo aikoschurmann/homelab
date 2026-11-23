@@ -169,6 +169,7 @@ def create_app():
     from app.api.logs import logs_bp
     from app.api.updates import updates_bp
     from app.api.access import access_bp
+    from app.api.apps import apps_bp
 
     app.register_blueprint(system_bp, url_prefix='/api')
     app.register_blueprint(tmux_bp, url_prefix='/api/tmux')
@@ -189,6 +190,7 @@ def create_app():
     app.register_blueprint(logs_bp, url_prefix='/api/logs')
     app.register_blueprint(updates_bp, url_prefix='/api/updates')
     app.register_blueprint(access_bp, url_prefix='/api/access')
+    app.register_blueprint(apps_bp, url_prefix='/api/apps')
 
     # Register websocket
     from app.websocket.terminal import register_websocket

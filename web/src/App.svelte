@@ -21,6 +21,7 @@
     import CloudflareTab from './components/CloudflareTab.svelte';
     import LogsTab from './components/LogsTab.svelte';
     import UpdatesTab from './components/UpdatesTab.svelte';
+    import AppsTab from './components/AppsTab.svelte';
     import Sortable from 'sortablejs';
     import { Loader2 } from 'lucide-svelte';
     import { stats as statsStore, uplink, visible, machines } from './lib/stores.js';
@@ -354,6 +355,10 @@
 
                 {#if activeTab === 'Updates'}
                     <UpdatesTab />
+                {/if}
+
+                {#if activeTab === 'Apps'}
+                    <AppsTab section={activeSection} onNavigate={navigate} />
                 {/if}
 
 

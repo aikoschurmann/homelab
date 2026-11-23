@@ -956,12 +956,13 @@ GROUP_DOCS = {
     "Hardware": "Temperatures, drive health (SMART) and UPS power, of this server and other hosts.",
     "Logs": "One search across every container's logs and the Mac apps' log files.",
     "Updates": "Outdated packages on the Mac, its machines and other hosts, and applying them.",
+    "Apps": "Install apps from the catalogue into a machine; update, restart or remove Compose apps.",
     "Dashboard": "The dashboard's own data: stats stream, history, preferences and this catalog.",
     "Internal": "Plumbing for the agent, live streams and the terminal. Not meant to be called by hand.",
 }
 _BP_GROUP = {"vms": "Machines", "hosts": "Hosts", "compute": "Compute", "storage": "Storage", "tailscale": "Tailscale",
              "databases": "Databases", "backups": "Backups", "tmux": "Terminal", "services": "Services",
-             "uptime": "Uptime", "hardware": "Hardware", "logs": "Logs", "updates": "Updates"}
+             "uptime": "Uptime", "hardware": "Hardware", "logs": "Logs", "updates": "Updates", "apps": "Apps"}
 
 
 # Descriptions for routes whose view has no docstring (keyed "METHOD path").

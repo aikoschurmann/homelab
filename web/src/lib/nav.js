@@ -1,5 +1,5 @@
 import { SN } from './server.js';
-import { Activity, Eye, Boxes, Database, Box, Archive, Terminal, Settings, Network, Server, Gauge, Cloud, Globe, ScrollText, PackageCheck } from 'lucide-svelte';
+import { Activity, Eye, Boxes, Database, Box, Archive, Terminal, Settings, Network, Server, Gauge, Cloud, Globe, ScrollText, PackageCheck, Store } from 'lucide-svelte';
 
 // Sidebar tree. A child with `el` is a section of its page (the element id it scrolls
 // to); a child with el: null is a page of its own (id '' = the tab's main page).
@@ -25,6 +25,7 @@ export const NAV = [
         // sub: its children show in the sidebar too (other items keep theirs on the page)
         { tab: 'Databases', icon: Database, sub: true, children: [page('', 'All databases')] },
         { tab: 'Backups', icon: Archive, sub: true, children: [page('', 'Snapshots'), page('coverage', "What's covered"), page('runs', 'Runs')] },
+        { tab: 'Apps', icon: Store, sub: true, children: [page('', 'Catalogue'), page('installed', 'Installed')] },
         { tab: 'Logs', icon: ScrollText },
         { tab: 'Updates', icon: PackageCheck },
         { tab: 'Terminal', icon: Terminal, sub: true, children: [page('', 'Sessions'), page('saved', 'Saved commands')] },
