@@ -1,0 +1,179 @@
+/* Shared console primitives (ui-*): cards, tables, toolbars, buttons, key/value lists.
+   Rebuilt pages use these instead of their own one-off card/table CSS. */
+
+/* ---- page header ---- */
+.ui-page { display: flex; flex-direction: column; gap: 20px; padding: 8px 0 64px; }
+.ui-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.ui-head h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ui-head p { margin: 4px 0 0; font-size: 14px; color: var(--text-secondary); }
+.ui-head-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.ui-back { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--accent); cursor: pointer; margin-bottom: 6px; }
+.ui-back:hover { text-decoration: underline; }
+.ui-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; font-size: 13px; color: var(--text-secondary); }
+.ui-meta b { font-weight: 500; color: var(--text-primary); }
+
+/* ---- cards ---- */
+.ui-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 8px); container-type: inline-size; }
+.ui-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px 20px; }
+.ui-card-head + .ui-card-body, .ui-card-head + .ui-tbl-wrap { border-top: 1px solid var(--border); }
+.ui-card-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.ui-card-desc { margin: 3px 0 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.ui-card-body { padding: 16px 20px; }
+.ui-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--highlight-3); border-radius: 0 0 var(--radius-card, 8px) var(--radius-card, 8px); font-size: 13px; color: var(--text-secondary); }
+.ui-card-foot .ui-btns { margin-left: auto; }
+.ui-card.danger { border-color: rgba(184, 76, 62, 0.45); }
+.ui-card.danger .ui-card-title { color: var(--red); }
+
+/* ---- stat tiles ---- */
+.ui-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.ui-stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 8px); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ui-stat-label { font-size: 12.5px; color: var(--text-secondary); font-weight: 500; }
+.ui-stat-value { font-size: 22px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ui-stat-value small { font-size: 13px; font-weight: 400; color: var(--text-secondary); margin-left: 4px; }
+.ui-stat-sub { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+.ui-meter { height: 4px; border-radius: 2px; background: var(--highlight-15); overflow: hidden; }
+.ui-meter > i { display: block; height: 100%; border-radius: 2px; transition: width .3s ease; }
+
+/* ---- key / value list ---- */
+.ui-kv { display: grid; grid-template-columns: minmax(120px, 200px) 1fr; margin: 0; }
+.ui-kv > dt, .ui-kv > dd { margin: 0; padding: 11px 20px; border-top: 1px solid var(--border); font-size: 13.5px; min-width: 0; }
+.ui-kv > dt:first-of-type, .ui-kv > dt:first-of-type + dd { border-top: none; }
+.ui-kv > dt { color: var(--text-secondary); }
+.ui-kv > dd { color: var(--text-primary); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; overflow-wrap: anywhere; }
+
+/* ---- tables ---- */
+.ui-tbl-wrap { overflow-x: auto; }
+/* Columns drop by the card's own width (not the window's), lowest priority first:
+   c-xl < 1300px, c-lg < 1000px, c-md < 860px, c-sm < 600px */
+@container (max-width: 1300px) { .c-xl { display: none; } }
+@container (max-width: 1000px) { .c-lg { display: none; } }
+@container (max-width: 860px) { .c-md { display: none; } }
+@container (max-width: 600px) { .c-sm { display: none; } }
+/* long values truncate inside their cell instead of widening the table */
+.ui-tbl .trunc { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.ui-tbl .wrap { white-space: normal; }
+.ui-tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+/* quiet column labels, no shaded header, and a header rule the same weight as the row rules;
+   every column is left-aligned so cell text starts under its label */
+.ui-tbl th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-secondary); padding: 14px 16px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.ui-tbl td { padding: 13px 16px; border-bottom: 1px solid var(--border); color: var(--text-primary); white-space: nowrap; vertical-align: middle; }
+.ui-tbl tbody tr:first-child td { padding-top: 14px; }
+/* status pills read as a dot and a word in a table, like the Tailscale table, so they line up with the header */
+.ui-tbl td .pill { background: none; padding: 0; height: auto; font-size: 13px; }
+.ui-tbl tr:last-child td { border-bottom: none; }
+.ui-tbl tbody tr.click { cursor: pointer; }
+.ui-tbl tbody tr.click:hover td { background: var(--highlight-3); }
+.ui-tbl th:first-child, .ui-tbl td:first-child { padding-left: 20px; }
+.ui-tbl th:last-child, .ui-tbl td:last-child { padding-right: 20px; }
+.ui-tbl .shrink { width: 1%; }
+.ui-empty { padding: 40px 20px; text-align: center; color: var(--text-secondary); font-size: 13.5px; }
+
+/* ---- toolbar ---- */
+.ui-toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.ui-search { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--text-secondary); width: 260px; max-width: 100%; box-sizing: border-box; }
+.ui-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ui-search input { border: none; background: transparent; outline: none; font: inherit; font-size: 13.5px; color: var(--text-primary); width: 100%; }
+.ui-toolbar .ui-count { margin-left: auto; font-size: 13px; color: var(--text-secondary); }
+
+/* ---- buttons ---- */
+.ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-primary); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; white-space: nowrap; box-sizing: border-box; }
+.ui-btn:hover:not(:disabled) { background: var(--highlight-5); }
+.ui-btn:disabled { opacity: 0.45; cursor: default; }
+.ui-btn.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-fg); }
+.ui-btn.primary:hover:not(:disabled) { background: var(--accent-fill); opacity: 0.88; }
+.ui-btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
+.ui-btn.danger:hover:not(:disabled) { background: var(--red); filter: brightness(0.92); }
+.ui-btn.danger-outline { color: var(--red); }
+.ui-btn.sm { height: 28px; padding: 0 10px; font-size: 12.5px; }
+.ui-btn.icon { width: 32px; padding: 0; }
+.ui-btns { display: flex; gap: 8px; align-items: center; }
+a.ui-btn { text-decoration: none; }
+.ui-link { color: var(--accent); cursor: pointer; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 3px; }
+.ui-link:hover { text-decoration: underline; }
+
+/* ---- form controls ---- */
+.ui-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ui-field > label, .ui-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.ui-hint { font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; }
+.ui-input, .ui-select { height: 34px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--text-primary); font: inherit; font-size: 13.5px; box-sizing: border-box; width: 100%; }
+.ui-input:focus, .ui-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ui-input.bad { border-color: var(--red); }
+.ui-input.mono { font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.ui-seg { display: inline-flex; height: 32px; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; width: fit-content; }
+.ui-seg button { padding: 0 12px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
+.ui-seg button + button { border-left: 1px solid var(--border-strong); }
+.ui-seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.ui-seg button:disabled { opacity: 0.4; cursor: default; }
+.ui-form-row { display: grid; grid-template-columns: 220px 1fr; gap: 24px; padding: 18px 20px; border-top: 1px solid var(--border); align-items: start; }
+.ui-form-row:first-child { border-top: none; }
+/* controls keep their own width instead of stretching across the row */
+.ui-form-row > :last-child { justify-self: start; max-width: 100%; }
+.ui-form-row > .ui-input, .ui-form-row > .inline, .ui-form-row > .ui-field { justify-self: stretch; }
+
+/* ---- bits ---- */
+.ui-mono { font-family: 'JetBrains Mono', monospace; font-size: 12.5px; }
+.ui-dim { color: var(--text-secondary); }
+.ui-tag { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); }
+.ui-banner { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 6px; font-size: 13px; background: var(--accent-soft); color: var(--text-primary); border: 1px solid transparent; }
+.ui-banner.warn { background: rgba(201, 147, 46, 0.12); }
+.ui-spin { animation: ui-spin 1s linear infinite; }
+@keyframes ui-spin { 100% { transform: rotate(360deg); } }
+
+@media (max-width: 640px) {
+  /* summary tiles: two per row and compact, so content starts on the first screen */
+  .ui-page .summary { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .ui-page .summary > * { grid-column: auto !important; order: 0 !important; }
+  .ui-page .summary > :last-child:nth-child(odd) { grid-column: 1 / -1 !important; }
+  .ui-stat { padding: 10px 12px; gap: 3px; }
+  .ui-stat-value { font-size: 18px; }
+  .ui-stat-value small { font-size: 11.5px; }
+  .ui-stat-label, .ui-stat-sub { font-size: 11.5px; }
+  /* long cell text wraps instead of widening the table */
+  .ui-tbl td:first-child { white-space: normal; overflow-wrap: anywhere; }
+}
+
+@media (max-width: 768px) {
+  .ui-page { padding: 4px 8px 48px; gap: 16px; }
+  .ui-form-row { grid-template-columns: 1fr; gap: 10px; }
+  .ui-kv { grid-template-columns: 1fr; }
+  .ui-kv > dt { padding-bottom: 0; }
+  .ui-kv > dd { border-top: none; padding-top: 4px; }
+  .ui-card-head, .ui-card-body, .ui-card-foot, .ui-toolbar { padding-left: 14px; padding-right: 14px; }
+  .ui-search { width: 100%; }
+  .ui-tbl th, .ui-tbl td { padding-left: 10px; padding-right: 10px; }
+  .ui-tbl th:first-child, .ui-tbl td:first-child { padding-left: 14px; }
+  .ui-tbl th:last-child, .ui-tbl td:last-child { padding-right: 8px; }
+}
+
+/* Segmented filters in a toolbar become wrapping pills on a phone, instead of
+   squeezing their labels onto two lines */
+@media (max-width: 640px) {
+  .ui-toolbar .ui-seg, .ui-listbar .ui-seg:not(.view) { height: auto; border: none; border-radius: 0; overflow: visible; flex-wrap: wrap; gap: 6px; width: 100%; }
+  .ui-toolbar .ui-seg button, .ui-listbar .ui-seg:not(.view) button { height: 30px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 15px; white-space: nowrap; }
+  .ui-toolbar .ui-seg button + button, .ui-listbar .ui-seg:not(.view) button + button { border-left: 1px solid var(--border-strong); }
+  .ui-toolbar .ui-seg button.on, .ui-listbar .ui-seg:not(.view) button.on { border-color: transparent; }
+}
+
+/* List page layout, as on the OrbStack VM page: summary tiles (segmented bars with
+   a legend), a toolbar, then a grid of ResourceCards */
+.ui-summary { display: grid; grid-template-columns: 0.7fr 1fr 1fr 0.7fr; gap: 12px; }
+.ui-segbar { display: flex; height: 6px; border-radius: 3px; background: var(--highlight-15); overflow: hidden; }
+.ui-segbar i { display: block; height: 100%; transition: width .3s ease; }
+/* parts are shades of one colour, so a 2px cut in the card colour keeps them apart (the track showed through the old 1px gap and blurred them) */
+.ui-segbar i + i { border-left: 2px solid var(--surface); }
+.ui-legend { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.ui-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.ui-legend b { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.ui-listbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ui-listbar .ui-count { margin-left: auto; font-size: 13px; color: var(--text-secondary); }
+.ui-listbar .ui-seg.view button { padding: 0 9px; display: flex; align-items: center; }
+.ui-cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+@media (max-width: 1100px) { .ui-summary { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) {
+  .ui-cardgrid { grid-template-columns: 1fr; }
+  .ui-summary > :nth-child(2), .ui-summary > :nth-child(3) { grid-column: 1 / -1; order: 1; }
+}
+
+/* a setting opened from ⌘K: briefly highlighted where it lives */
+.setting-flash { animation: setting-flash 2.2s ease-out; border-radius: 6px; }
+@keyframes setting-flash { 0%, 25% { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); } 100% { background: transparent; box-shadow: inset 3px 0 0 transparent; } }

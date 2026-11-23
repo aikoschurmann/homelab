@@ -1,0 +1,11 @@
+# build output (npm run build writes here; install.sh rebuilds it)
+server/static/
+# environments
+server/venv/
+web/node_modules/
+__pycache__/
+*.pyc
+# runtime state never lives in the repo (see ~/.config/homelab)
+*.db
+*.log
+.DS_Store

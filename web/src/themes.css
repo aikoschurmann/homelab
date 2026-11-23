@@ -1,0 +1,207 @@
+/* Dark themes, all Dune-named. Dune (warm sand, the default) lives in cf.css/app.css :root; each theme
+   here overrides the surface, text, border, accent, metric and status tokens, plus
+   --chrome (sidebar + top bar) and --logo-bg.
+   The list shown in Settings is THEMES in lib/theme.js. */
+
+:root { color-scheme: dark; }
+
+/* Spice: melange orange on burnt umber */
+[data-theme="spice"] {
+  --bg: #170D08;
+  --surface: #24150D;
+  --text-primary: #F3E3D3;
+  --text-secondary: #B8957A;
+  --border: #402616;
+  --border-strong: rgba(255, 150, 80, 0.24);
+  --accent: #FF8A3D;
+  --accent-hover: #FFA766;
+  --accent-fill: #FF8A3D;
+  --accent-fg: #170D08;
+  --accent-soft: rgba(255, 138, 61, 0.16);
+  --metric-cpu: #FF8A3D;
+  --metric-mem: #FFC34D;
+  --metric-net: #E8566B;
+  --metric-disk: #A68B74;
+  --chrome: #0E0703;
+  --logo-bg: #FF8A3D;
+  --logo-fg: #170D08;
+  --green: #B5C26A;
+  --yellow: #FFC34D;
+  --red: #F2604D;
+}
+
+/* Ibad: blue-within-blue, the eyes of spice */
+[data-theme="ibad"] {
+  --bg: #060E1C;
+  --surface: #0D1A2F;
+  --text-primary: #DDEBFF;
+  --text-secondary: #7F9CC4;
+  --border: #162E4C;
+  --border-strong: rgba(80, 170, 255, 0.26);
+  --accent: #3FB8FF;
+  --accent-hover: #74CCFF;
+  --accent-fill: #3FB8FF;
+  --accent-fg: #06101F;
+  --accent-soft: rgba(63, 184, 255, 0.16);
+  --metric-cpu: #3FB8FF;
+  --metric-mem: #7C8CFF;
+  --metric-net: #36E0D0;
+  --metric-disk: #6F84A6;
+  --chrome: #030812;
+  --logo-bg: #3FB8FF;
+  --logo-fg: #06101F;
+  --green: #4FE0B0;
+  --yellow: #FFD166;
+  --red: #FF6B8A;
+}
+
+/* Caladan: Atreides sea-green over deep ocean */
+[data-theme="caladan"] {
+  --bg: #08130F;
+  --surface: #0F1F1A;
+  --text-primary: #DCF3EA;
+  --text-secondary: #80A89A;
+  --border: #17362C;
+  --border-strong: rgba(80, 210, 165, 0.25);
+  --accent: #4FD1A5;
+  --accent-hover: #7FDFBE;
+  --accent-fill: #4FD1A5;
+  --accent-fg: #04120D;
+  --accent-soft: rgba(79, 209, 165, 0.14);
+  --metric-cpu: #4FD1A5;
+  --metric-mem: #4FA3E0;
+  --metric-net: #E0B44F;
+  --metric-disk: #6E8E84;
+  --chrome: #040C09;
+  --logo-bg: #4FD1A5;
+  --logo-fg: #04120D;
+  --green: #6EE7A8;
+  --yellow: #F2C94C;
+  --red: #F2766B;
+}
+
+/* Giedi Prime: Harkonnen black-sun — true black, bone-white accent, blood-red highlights */
+[data-theme="giedi"] {
+  --bg: #000000;
+  --surface: #0B0B0B;
+  --text-primary: #ECE9E4;
+  --text-secondary: #8F8B85;
+  --border: #232323;
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --accent: #E8E4DC;
+  --accent-hover: #FFFFFF;
+  --accent-fill: #E8E4DC;
+  --accent-fg: #000000;
+  --accent-soft: rgba(232, 228, 220, 0.1);
+  --metric-cpu: #E8E4DC;
+  --metric-mem: #D93B3B;
+  --metric-net: #B5B5B5;
+  --metric-disk: #5A5A5A;
+  --chrome: #000000;
+  --logo-bg: #D93B3B;
+  --logo-fg: #000000;
+  --green: #5FCB85;
+  --yellow: #E6B93F;
+  --red: #E03C3C;
+}
+
+
+/* Bene Gesserit: violet sisterhood over black-plum robes */
+[data-theme="bene-gesserit"] {
+  --bg: #0A0710;
+  --surface: #14101D;
+  --text-primary: #ECE4F7;
+  --text-secondary: #9D90B3;
+  --border: #271E37;
+  --border-strong: rgba(180, 140, 255, 0.24);
+  --accent: #B48CFF;
+  --accent-hover: #CBADFF;
+  --accent-fill: #B48CFF;
+  --accent-fg: #0A0710;
+  --accent-soft: rgba(180, 140, 255, 0.14);
+  --metric-cpu: #B48CFF;
+  --metric-mem: #FF8FC8;
+  --metric-net: #6FC8FF;
+  --metric-disk: #7E7392;
+  --chrome: #050308;
+  --logo-bg: #B48CFF;
+  --logo-fg: #0A0710;
+  --green: #7FDBA6;
+  --yellow: #F2C76B;
+  --red: #FF7A8A;
+}
+
+/* Kaitain: imperial gold on Corrino midnight */
+[data-theme="kaitain"] {
+  --bg: #0B0D1A;
+  --surface: #141829;
+  --text-primary: #EEE8D6;
+  --text-secondary: #9A97AE;
+  --border: #252A45;
+  --border-strong: rgba(232, 190, 90, 0.24);
+  --accent: #E8BE5A;
+  --accent-hover: #F2D186;
+  --accent-fill: #E8BE5A;
+  --accent-fg: #0B0D1A;
+  --accent-soft: rgba(232, 190, 90, 0.14);
+  --metric-cpu: #E8BE5A;
+  --metric-mem: #8C9CFF;
+  --metric-net: #D9707A;
+  --metric-disk: #717591;
+  --chrome: #06070F;
+  --logo-bg: #E8BE5A;
+  --logo-fg: #0B0D1A;
+  --green: #86D19B;
+  --yellow: #F0C24F;
+  --red: #EE6B6B;
+}
+
+/* Salusa Secundus: ash-grey prison world, Sardaukar rust */
+[data-theme="salusa"] {
+  --bg: #111213;
+  --surface: #1B1D1F;
+  --text-primary: #E2E4E6;
+  --text-secondary: #92979C;
+  --border: #2D3033;
+  --border-strong: rgba(220, 120, 80, 0.22);
+  --accent: #D9774A;
+  --accent-hover: #E89A75;
+  --accent-fill: #D9774A;
+  --accent-fg: #111213;
+  --accent-soft: rgba(217, 119, 74, 0.14);
+  --metric-cpu: #D9774A;
+  --metric-mem: #8FA9C2;
+  --metric-net: #C9B26B;
+  --metric-disk: #6A6F74;
+  --chrome: #0A0B0B;
+  --logo-bg: #D9774A;
+  --logo-fg: #111213;
+  --green: #95C48A;
+  --yellow: #DDB75E;
+  --red: #E0655A;
+}
+
+/* Ix: machine-world gunmetal, chartreuse readouts */
+[data-theme="ix"] {
+  --bg: #0C0F10;
+  --surface: #151A1C;
+  --text-primary: #E1EAE6;
+  --text-secondary: #87958F;
+  --border: #243034;
+  --border-strong: rgba(190, 230, 80, 0.22);
+  --accent: #BEE650;
+  --accent-hover: #D2F07E;
+  --accent-fill: #BEE650;
+  --accent-fg: #0C0F10;
+  --accent-soft: rgba(190, 230, 80, 0.12);
+  --metric-cpu: #BEE650;
+  --metric-mem: #4FC9D9;
+  --metric-net: #F0A24F;
+  --metric-disk: #66757A;
+  --chrome: #070909;
+  --logo-bg: #BEE650;
+  --logo-fg: #0C0F10;
+  --green: #6FE0A0;
+  --yellow: #F2D04F;
+  --red: #FF6B5E;
+}

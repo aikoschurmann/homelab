@@ -1,0 +1,161 @@
+/* Console skin: colour tokens (warm Control Room palette) plus cards, headers, tables and buttons.
+   Pages keep their own layout CSS; this layer only restyles the shared pieces
+   (.group cards, .group-header/.group-title, table heads, buttons). Selectors are
+   prefixed with .app-body .page-wrap so they outrank the per-component scoped rules. */
+
+/* Dune: the default (warm dark). Other themes in themes.css override these tokens. */
+:root {
+  --bg: #0F0E0D;
+  --surface: #1A1817;
+  --text-primary: #E6E1D8;
+  --text-secondary: #A39D92;
+  /* opaque (= the old translucent tint over --surface) so every hairline is the same colour whatever is under it, and a line painted twice doesn't brighten */
+  --border: #2E2A27;
+  --border-strong: rgba(214, 199, 174, 0.2);
+  --accent: #D6C2A0;
+  --accent-hover: #E8D8BC;
+  --accent-fill: #E6E1D8;
+  --accent-fg: #0F0E0D;
+  --accent-soft: rgba(214, 194, 160, 0.12);
+  --chrome: #0A0908;
+  --logo-bg: #D6C2A0;
+  --logo-fg: #0F0E0D;
+  --green: #A3C27E;
+  --yellow: #E3B65C;
+  --red: #E0796A;
+
+  --highlight-2: rgba(255, 255, 255, 0.015);
+  --highlight-3: rgba(255, 255, 255, 0.025);
+  --highlight-5: rgba(255, 255, 255, 0.035);
+  --highlight-10: rgba(255, 255, 255, 0.06);
+  --highlight-15: rgba(255, 255, 255, 0.09);
+  --highlight-20: rgba(255, 255, 255, 0.12);
+  --highlight-30: rgba(255, 255, 255, 0.17);
+}
+
+/* ---- page frame: pages start right under the top bar ---- */
+.app-body .page-wrap > * { padding-top: 8px; }
+
+/* ---- page header ---- */
+.app-body .page-wrap .page-head { gap: 4px; margin-bottom: 20px; }
+.app-body .page-wrap .page-head h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.app-body .page-wrap .page-head p { font-size: 14px; }
+
+/* ---- cards ---- */
+.app-body .page-wrap .group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card, 8px);
+  background: var(--surface);
+  box-shadow: none;
+}
+.app-body .page-wrap .group .group-header {
+  padding: 14px 20px;
+  gap: 10px;
+  min-height: 52px;
+  box-sizing: border-box;
+}
+.app-body .page-wrap .group .group-header:hover { background: transparent; }
+.app-body .page-wrap .group .group-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  text-transform: none;
+  color: var(--text-primary);
+  margin-right: 0;
+}
+.app-body .page-wrap .group .group-count,
+.app-body .page-wrap .group .group-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  opacity: 1;
+  margin-left: 0;
+}
+.app-body .page-wrap .group .group-chevron {
+  color: var(--text-secondary);
+  border-radius: 4px;
+}
+.app-body .page-wrap .group .group-body { border-top: 1px solid var(--border); }
+
+/* ---- legacy table heads: tinted row, sentence case (the hosts tree styles its own header like .ui-tbl) ---- */
+.app-body .page-wrap .data-table th {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-secondary);
+  background: var(--highlight-3);
+}
+.app-body .page-wrap .tr.th .mtitle {
+  font-size: 15px;
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+
+/* host card on Overview (own markup, same card language) */
+.app-body .page-wrap .host-card { border-radius: var(--radius-card, 8px); }
+.app-body .page-wrap .host-card .node-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.app-body .page-wrap .host-card .node-kind { font-size: 13px; }
+.app-body .page-wrap .host-card .lbl,
+.app-body .page-wrap .tiles .lbl {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+}
+.app-body .page-wrap .tr.th .mtitle { letter-spacing: -0.005em; font-family: 'Inter', sans-serif; }
+
+/* ---- buttons: blue primary, quiet secondary ---- */
+.app-body .page-wrap .btn,
+.app-body .page-wrap .ghost-btn,
+.app-body .page-wrap .copy-btn,
+.app-body .page-wrap .log-btn {
+  border-radius: 6px;
+  border-color: var(--border-strong);
+}
+.app-body .page-wrap .btn.primary,
+.app-body .page-wrap .run-btn,
+.app-body .page-wrap .trigger-btn,
+.app-body .page-wrap .trigger-api-btn {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--accent-fg);
+  border-radius: 6px;
+  opacity: 1;
+}
+.app-body .page-wrap .btn.primary:hover:not(:disabled),
+.app-body .page-wrap .run-btn:hover:not(:disabled),
+.app-body .page-wrap .trigger-btn:hover:not(:disabled),
+.app-body .page-wrap .trigger-api-btn:hover:not(:disabled) {
+  background: var(--accent-fill);
+  opacity: 0.88;
+}
+.app-body .page-wrap .btn.primary:disabled,
+.app-body .page-wrap .run-btn:disabled,
+.app-body .page-wrap .trigger-btn:disabled,
+.app-body .page-wrap .trigger-api-btn:disabled {
+  opacity: 0.4;
+}
+
+/* ---- form fields ---- */
+.app-body .page-wrap input[type="text"],
+.app-body .page-wrap input[type="number"],
+.app-body .page-wrap input[type="password"],
+.app-body .page-wrap select {
+  border-radius: 6px;
+}
+.app-body .page-wrap input:focus,
+.app-body .page-wrap select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  outline: none;
+}
+
+@media (max-width: 768px) {
+  .app-body .page-wrap .group .group-header { padding: 12px 14px; min-height: 48px; }
+}
