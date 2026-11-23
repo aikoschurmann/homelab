@@ -155,7 +155,8 @@ def _daemon_log_sources(daemon_id):
     import glob, os
     home = os.path.expanduser('~')
     if daemon_id == 'dashboard':
-        return ['/tmp/homelab-dashboard.out', '/tmp/homelab-dashboard.err']
+        from app.core import paths
+        return [os.path.join(paths.LOGS, 'dashboard.out'), os.path.join(paths.LOGS, 'dashboard.err')]
     if daemon_id == 'jellyfin':
         files = sorted(glob.glob(f'{home}/Library/Application Support/jellyfin/log/log_*.log'))
         return files[-1:]

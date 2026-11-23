@@ -4,8 +4,9 @@ import os
 import time
 from app.core.logger import log
 from app.core.db_writer import DBWriter
+from app.core import paths
 
-DB_PATH = os.path.expanduser('~/.databases/metrics.db')
+DB_PATH = paths.metrics_db()
 _writer = None
 
 def get_writer():
@@ -321,7 +322,7 @@ KEEP = {
 
 def keep_days():
     try:
-        with open(os.path.expanduser('~/.homelab_prefs.json')) as f:
+        with open(paths.state('prefs')) as f:
             want = json.load(f).get("data_keep") or {}
     except (OSError, ValueError):
         want = {}

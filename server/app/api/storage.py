@@ -5,7 +5,7 @@ reports (app/api/hosts.py); Linux hosts' drives come from lsblk there.
 
 Listing and info come from `diskutil -plist` (read-only). The only actions are mount,
 unmount and eject. Nothing here can erase, format or rename a drive, by design.
-Drives the user marked as never-to-be-erased are listed in ~/.homelab_storage.json
+Drives the user marked as never-to-be-erased are listed in $HOMELAB_HOME/storage.json
 (model name + exact size) and shown as Protected.
 """
 from flask import Blueprint, jsonify, request
@@ -18,10 +18,11 @@ import threading
 import time
 
 from app.core.logger import log
+from app.core import paths
 
 storage_bp = Blueprint('storage', __name__)
 
-STORE = os.path.expanduser('~/.homelab_storage.json')
+STORE = paths.state('storage')
 # APFS volumes that are plumbing, not something to show
 HIDDEN_ROLES = {'Preboot', 'Recovery', 'Update', 'VM', 'xART', 'Hardware'}
 _lock = threading.Lock()

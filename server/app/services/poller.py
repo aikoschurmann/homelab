@@ -3,6 +3,7 @@ from app.core.logger import log
 from app.core.config import VM_CMD_PREFIX
 from app.core.cache import global_state
 from app.services.arrakis_parser import parse_arrakis_native
+from app.core import paths
 
 def poll_metrics_loop():
     last_net = psutil.net_io_counters()
@@ -174,7 +175,7 @@ def poll_background_loop():
 from app.core.db import init_db, insert_metrics, cleanup_old_metrics, insert_service_metric, insert_disk_metric
 
 def poll_db_loop():
-    prefs_file = os.path.expanduser('~/.homelab_prefs.json')
+    prefs_file = paths.state('prefs')
     last_cleanup = 0
     last_disk = 0
     DISK_SAMPLE_SECONDS = 600

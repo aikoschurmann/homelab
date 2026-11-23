@@ -1,6 +1,6 @@
-"""What the nightly backup (~/Homelab-Backups/backup.sh) saves and where.
+"""What the nightly backup (scripts/backup.sh) saves and where.
 
-Kept in ~/.homelab_backup.json, which backup.sh reads with plutil:
+Kept in $HOMELAB_HOME/backup.json, which backup.sh reads with plutil:
   dest      folder the snapshots go to
   parts     which built-in parts run (jellyfin, vm_data, dashboard, server_config)
   folders   extra Mac folders, archived together as folders_<ts>.tar.gz
@@ -13,8 +13,9 @@ backup.sh records how the last copy went in <dest>/.copy_status ("ok <ts>" / "fa
 """
 import json
 import os
+from app.core import paths
 
-CONFIG_FILE = os.path.expanduser("~/.homelab_backup.json")
+CONFIG_FILE = paths.state("backup")
 DEFAULT_DEST = os.path.expanduser("~/Homelab-Backups/archive")
 PARTS = {
     "jellyfin": "Jellyfin settings and library database (not the media)",

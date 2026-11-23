@@ -25,6 +25,7 @@ from app.core import cftunnel, orbhost
 from app.core.config import VM_NAME
 from app.core.db import get_machine_history, insert_machine_metric, rename_machine_metrics
 from app.core.logger import log
+from app.core import paths
 
 vms_bp = Blueprint('vms', __name__)
 
@@ -123,7 +124,7 @@ def _images():
 
 # ---- tailscale ---------------------------------------------------------------------
 
-TS_KEY_FILE = os.path.expanduser('~/.homelab_tailscale.json')  # kept out of /api/prefs so it never reaches the browser
+TS_KEY_FILE = paths.secret('tailscale')  # kept out of /api/prefs so it never reaches the browser
 
 
 def _ts_key():
@@ -1273,7 +1274,7 @@ def share_vm(name):
     if not NAME_RE.match(name):
         return jsonify({"status": "error", "message": "bad machine name"})
     if not cftunnel.logged_in():
-        return jsonify({"status": "error", "message": "Save a Cloudflare API token in ~/.homelab_cloudflare.json first"})
+        return jsonify({"status": "error", "message": f"Save a Cloudflare API token in {cftunnel.TOKEN_FILE} first"})
     machines, _ = _get_list()
     m = next((x for x in machines if x["name"] == name), None)
     if not m:

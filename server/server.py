@@ -2,7 +2,9 @@ import socket
 import sys
 import time
 
-HOST, PORT = '0.0.0.0', 5050
+from app.core import server_cfg
+
+HOST, PORT = '0.0.0.0', server_cfg.port()
 
 
 def port_in_use():

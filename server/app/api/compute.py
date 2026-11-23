@@ -29,6 +29,7 @@ from collections import deque
 from pathlib import Path
 
 from app.core.logger import log
+from app.core import server_cfg
 
 compute_bp = Blueprint('compute', __name__)
 
@@ -214,7 +215,7 @@ def _clean(body, existing=None):
                  ('arrakis' if 'arrakis' in nodes else next(iter(nodes))))
     # Arrakis can also coordinate without doing work itself
     if scheduler != 'arrakis' and scheduler not in nodes:
-        return None, "The coordinator has to be Arrakis or one of the pool's computers"
+        return None, f"The coordinator has to be {server_cfg.name()} or one of the pool's computers"
     jobs_on = str(body.get("jobs_on", (existing or {}).get("jobs_on")) or 'arrakis')
     if jobs_on != 'arrakis' and jobs_on not in nodes:
         jobs_on = 'arrakis'                 # that node left the pool: back to Arrakis
@@ -447,7 +448,7 @@ def candidates():
     for c in _all():
         for n, spec in c["nodes"].items():
             known.setdefault(n, spec.get("ssh"))
-    out = [{"id": "arrakis", "name": "Arrakis", "ssh": known.get("arrakis", "arrakis"), "online": True, "os": "macOS", "cores": os.cpu_count()}]
+    out = [{"id": "arrakis", "name": server_cfg.name(), "ssh": known.get("arrakis", "arrakis"), "online": True, "os": "macOS", "cores": os.cpu_count()}]
     for h in load_hosts():
         p = _public(h)
         r = p.get("report") or {}
@@ -527,7 +528,7 @@ def ssh_check():
         r = subprocess.run(cmd if target is None else ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=6', target, 'echo ok'],
                            capture_output=True, text=True, timeout=12)
         ok = r.returncode == 0 and r.stdout.strip() == 'ok'
-        msg = 'Arrakis can log in' if ok else ((r.stderr.strip().splitlines() or ['no answer'])[-1])
+        msg = f'{server_cfg.name()} can log in' if ok else ((r.stderr.strip().splitlines() or ['no answer'])[-1])
     except subprocess.TimeoutExpired:
         ok, msg = False, 'no answer within 12 s'
     return jsonify({"status": "success", "data": {"ok": ok, "message": msg}})

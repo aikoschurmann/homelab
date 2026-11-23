@@ -1,8 +1,10 @@
 import json, os, re, threading, time, urllib.request
 from app.core.logger import log
 from app.core.cache import global_state
+from app.core import paths
+from app.core import server_cfg
 
-PREFS_FILE = os.path.expanduser('~/.homelab_prefs.json')
+PREFS_FILE = paths.state('prefs')
 CHECK_SECONDS = 15
 
 
@@ -85,10 +87,10 @@ def _discord_payload(title, body, kind, key, since):
         "description": body,
         "color": colour,
         "fields": fields,
-        "footer": {"text": "Arrakis Homelab Dashboard"},
+        "footer": {"text": f"{server_cfg.name()} Homelab Dashboard"},
         "timestamp": time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(now)),
     }
-    return {"username": "Arrakis", "embeds": [embed], "allowed_mentions": {"parse": []}}
+    return {"username": server_cfg.name(), "embeds": [embed], "allowed_mentions": {"parse": []}}
 
 
 def send_alert(title, body, prefs=None, kind='alert', key=None, since=None):
@@ -314,7 +316,7 @@ def alerts_loop():
                             continue
                         if key not in _active or (repeat and now - _active[key] > repeat):
                             category = key.split(':', 1)[0]
-                            outgoing.append((ALERT_TITLES.get(category, 'Arrakis alert'), msg, prefs,
+                            outgoing.append((ALERT_TITLES.get(category, f'{server_cfg.name()} alert'), msg, prefs,
                                              'warning' if category == 'disk' else 'alert', key, _first_seen[key]))
                             _active[key] = now
                     for key in [k for k in _active if k not in problems]:

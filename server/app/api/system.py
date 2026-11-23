@@ -6,6 +6,8 @@ import os
 
 from app.core.logger import log
 from app.core.cache import global_state
+from app.core import paths
+from app.core import server_cfg
 
 system_bp = Blueprint('system', __name__)
 
@@ -111,7 +113,7 @@ def tool_sources():
     """Places a check can run from: Arrakis, its running machines, online cluster hosts."""
     from app.core.tmux_target import running_machines, online_hosts
     from app.api import hosts
-    out = [{"id": "mac", "name": "Arrakis", "kind": "host", "os": "macOS"}]
+    out = [{"id": "mac", "name": server_cfg.name(), "kind": "host", "os": "macOS"}]
     out += [{"id": m, "name": m, "kind": "machine", "os": "Linux"} for m in sorted(running_machines())]
     for hid in online_hosts():
         h = next((x for x in hosts._load() if x['id'] == hid), None)
@@ -226,7 +228,7 @@ def tool_dns():
 
 
 # finished speed tests, newest first, kept across restarts (last 30)
-_SPEED_FILE = os.path.expanduser('~/.homelab_speedtests.json')
+_SPEED_FILE = paths.state('speedtests')
 def _speed_history():
     try:
         with open(_SPEED_FILE) as f:
@@ -445,7 +447,7 @@ def _mask(url):
 
 @system_bp.route('/prefs', methods=['GET', 'POST'])
 def handle_prefs():
-    prefs_file = os.path.expanduser('~/.homelab_prefs.json')
+    prefs_file = paths.state('prefs')
     import json
     if request.method == 'POST':
         try:
@@ -503,10 +505,11 @@ def host_info():
 @system_bp.route('/vm/info', methods=['GET'])
 def vm_info():
     from app.core.cache import global_state
+    from app.core.config import VM_NAME
     with global_state.lock:
         details = global_state.stats.get("vm", {}).get("details", {})
     return jsonify({
-        "hostname": "sietch",
+        "hostname": VM_NAME,
         "os": "Linux (OrbStack)",
         "uptime": details.get("Uptime", "Unknown"),
         "local_ip": details.get("Local IP", "Unknown"),
@@ -796,7 +799,7 @@ def set_retention():
     """{kind: days}: keep that history this long. Older rows are deleted right away."""
     from app.core import db
     body = request.get_json(silent=True) or {}
-    prefs_file = os.path.expanduser('~/.homelab_prefs.json')
+    prefs_file = paths.state('prefs')
     try:
         with open(prefs_file) as f:
             prefs = json.load(f)
@@ -938,7 +941,7 @@ GROUP_DOCS = {
     "Sharing": "Public SSH access to machines and each person's permissions.",
     "Hosts": "Other computers reporting in through the agent.",
     "Services": "Containers and daemons, their logs and history.",
-    "Tailscale": "The tailnet as Arrakis sees it, and network tests.",
+    "Tailscale": "The tailnet as this server sees it, and network tests.",
     "Databases": "Read-only look at the dashboard's SQLite files.",
     "Storage": "Drives and volumes on the Mac.",
     "Compute": "Compute pools and their jobs.",

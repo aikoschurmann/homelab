@@ -7,8 +7,8 @@ reaching the machine network, and sharing or unsharing one machine leaves the ot
 Unsharing deletes the tunnel and its DNS record, so access ends even if the machine is stopped.
 
 Everything on Cloudflare's side goes through the API with the token in
-~/.homelab_cloudflare.json (Account: Cloudflare Tunnel Edit, Zone: DNS Edit). State (which
-machines are shared, their tunnel ids and the keys added) lives in ~/.homelab_shares.json.
+$HOMELAB_HOME/secrets/cloudflare.json (Account: Cloudflare Tunnel Edit, Zone: DNS Edit). State (which
+machines are shared, their tunnel ids and the keys added) lives in $HOMELAB_HOME/shares.json.
 
 Machines on other hosts (orbhost.current set) are shared the same way: state is keyed
 '<host>:<name>' and the hostname is <name>-<host>.<domain>, since Universal SSL only
@@ -28,10 +28,11 @@ import urllib.request
 
 from app.core import orbhost
 from app.core.logger import log
+from app.core import paths
 
 DEFAULT_DOMAIN = "aikoschurmann.com"
-TOKEN_FILE = os.path.expanduser("~/.homelab_cloudflare.json")  # never sent to the browser
-STATE_FILE = os.path.expanduser("~/.homelab_shares.json")
+TOKEN_FILE = paths.secret("cloudflare")  # never sent to the browser
+STATE_FILE = paths.state("shares")
 REMOTE_DIR = "/etc/cloudflared/share"
 
 _lock = threading.RLock()
@@ -218,7 +219,7 @@ def share_info(name, running=False):
 def _cf(method, path, body=None):
     token = _token()
     if not token:
-        raise RuntimeError("No Cloudflare API token saved (~/.homelab_cloudflare.json)")
+        raise RuntimeError(f"No Cloudflare API token saved ({TOKEN_FILE})")
     req = urllib.request.Request(f"https://api.cloudflare.com/client/v4{path}", method=method,
                                  data=json.dumps(body).encode() if body is not None else None,
                                  headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})

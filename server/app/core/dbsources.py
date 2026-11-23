@@ -23,8 +23,10 @@ import time
 
 from app.core import orbhost
 from app.core.logger import log
+from app.core import paths
+from app.core import server_cfg
 
-SNAP_DIR = os.path.expanduser("~/.cache/homelab-dbsnap")
+SNAP_DIR = os.path.join(paths.CACHE, "dbsnap")
 DISCOVER_SECONDS = 300
 REMOTE_MAX = 40 * 2 ** 20
 
@@ -55,7 +57,7 @@ _snap_locks = {}
 
 def _hosts():
     """(host id or None for Arrakis, label) for every host whose OrbStack we can reach."""
-    out = [(None, "Arrakis")]
+    out = [(None, server_cfg.name())]
     try:
         from app.api.hosts import _find
         for hid in orbhost.managed():

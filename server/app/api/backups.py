@@ -11,13 +11,18 @@ from app.core.logger import log
 backups_bp = Blueprint('backups', __name__)
 
 from app.core import backup_cfg
+from app.core import paths
+from app.core import server_cfg
 PLIST_PATH = os.path.expanduser('~/Library/LaunchAgents/com.homelab.backup.plist')
 
 @backups_bp.route('/config', methods=['GET'])
 def get_backups():
     try:
-        with open(PLIST_PATH, 'rb') as f:
-            plist = plistlib.load(f)
+        try:
+            with open(PLIST_PATH, 'rb') as f:
+                plist = plistlib.load(f)
+        except OSError:
+            plist = {'Label': 'com.homelab.backup'}
             day = 0
             hour = 4
             minute = 0
@@ -169,8 +174,11 @@ def config_backups():
                 or not (1 <= hour <= 168 if freq == 'hourly' else 0 <= hour <= 23):
             return jsonify({"status": "error", "message": "Invalid backup schedule"}), 400
         
-        with open(PLIST_PATH, 'rb') as f:
-            plist = plistlib.load(f)
+        try:
+            with open(PLIST_PATH, 'rb') as f:
+                plist = plistlib.load(f)
+        except OSError:
+            plist = {'Label': 'com.homelab.backup'}
             
         if freq == 'hourly':
             if 'StartCalendarInterval' in plist:
@@ -184,7 +192,10 @@ def config_backups():
                 interval['Weekday'] = day
             plist['StartCalendarInterval'] = interval
             
-        plist['ProgramArguments'] = ['/Users/muadhib/Homelab-Backups/backup.sh', str(retention)]
+        plist['ProgramArguments'] = ['/bin/bash', os.path.join(paths.SCRIPTS, 'backup.sh'), str(retention)]
+        plist['EnvironmentVariables'] = {'HOMELAB_HOME': paths.HOME}
+        plist['StandardOutPath'] = LOG_FILE
+        plist['StandardErrorPath'] = os.path.join(paths.LOGS, 'backup.err')
         
         with open(PLIST_PATH, 'wb') as f:
             plistlib.dump(plist, f)
@@ -476,10 +487,10 @@ def set_backup_settings():
 
 
 # ---- run history ----------------------------------------------------------------------
-# backup.sh appends every run to ~/Homelab-Backups/backup.out; a run starts with
+# backup.sh appends every run to $HOMELAB_HOME/logs/backup.out; a run starts with
 # "Starting Homelab Backup (<ts>)...". When it ended is the newest file it wrote.
 
-LOG_FILE = os.path.expanduser('~/Homelab-Backups/backup.out')
+LOG_FILE = os.path.join(paths.LOGS, 'backup.out')
 RUN_RE = re.compile(rf'^Starting Homelab Backup \(({TS_RE})\)')
 
 
@@ -550,7 +561,7 @@ def backup_coverage():
             latest[m.group(1)] = (m.group(2), os.path.getsize(f))
     part = lambda k: {"on": cfg["parts"].get(k, True), "last": latest.get(k, (None, None))[0], "size": latest.get(k, (None, None))[1]}
 
-    groups = [{"id": "arrakis", "name": "Arrakis", "kind": "mac", "editable": True, "items": [
+    groups = [{"id": "arrakis", "name": server_cfg.name(), "kind": "mac", "editable": True, "items": [
         {"id": "jellyfin", "name": "Jellyfin", "what": backup_cfg.PARTS["jellyfin"], **part("jellyfin")},
         {"id": "dashboard", "name": "Dashboard", "what": backup_cfg.PARTS["dashboard"], **part("dashboard")},
         {"id": "server_config", "name": "Server config", "what": backup_cfg.PARTS["server_config"], **part("server_config")},

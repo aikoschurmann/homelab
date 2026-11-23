@@ -11,10 +11,12 @@ from urllib.parse import quote
 
 from app.core import dbsources
 from app.core.logger import log
+from app.core import paths
+from app.core import server_cfg
 
 databases_bp = Blueprint('databases', __name__)
 
-DB_DIR = os.path.expanduser('~/.databases')
+DB_DIR = paths.DATA
 
 # Full COUNT(*) scans over every table are expensive (metrics.db alone has ~900k
 # rows) and the frontend polls this endpoint, so serve a short-lived cache.
@@ -146,7 +148,7 @@ def _scan_databases():
                     "path": db["path"],
                     "service": db["service"],
                     "type": db["type"],
-                    "host": None, "host_name": "Arrakis", "machine": None,
+                    "host": None, "host_name": server_cfg.name(), "machine": None,
                     "modified": int(os.path.getmtime(db['path'])),
                     "size_bytes": size_bytes,
                     "tables": tables
@@ -158,7 +160,7 @@ def _scan_databases():
                     "path": db["path"],
                     "service": db["service"],
                     "type": db["type"],
-                    "host": None, "host_name": "Arrakis", "machine": None,
+                    "host": None, "host_name": server_cfg.name(), "machine": None,
                     "error": str(e)
                 })
     return result

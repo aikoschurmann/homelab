@@ -4,6 +4,7 @@ import psutil
 from datetime import datetime
 
 from app.core.config import VM_NAME, VM_CMD_PREFIX
+from app.core import server_cfg
 
 def parse_arrakis_native():
     """
@@ -57,7 +58,7 @@ def parse_arrakis_native():
         for proc in psutil.process_iter(['name', 'cmdline', 'create_time']):
             if proc.info['name'] and 'python' in proc.info['name'].lower():
                 if proc.info['cmdline'] and any('server.py' in arg for arg in proc.info['cmdline']):
-                    return f"Up T:{int(proc.info['create_time'])} (http://localhost:5050)"
+                    return f"Up T:{int(proc.info['create_time'])} (http://localhost:{server_cfg.port()})"
         return "OFFLINE"
         
     jf_status = check_jf()

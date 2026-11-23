@@ -5,7 +5,7 @@ curl) that POSTs a snapshot to /api/hosts/report every 5 s over Tailscale. Addin
 host mints a token; the one-line install command fetches install.sh with that token,
 which writes the agent and registers it with launchd, systemd or cron.
 
-Hosts are kept in ~/.homelab_hosts.json (0600). Reports and the last hour of
+Hosts are kept in $HOMELAB_HOME/secrets/hosts.json (0600). Reports and the last hour of
 history live in memory, like the machines' samples.
 
 Actions (restart a service or container, reboot, update the agent) are queued here
@@ -23,7 +23,7 @@ Agent 6 also keeps a command channel open (a long poll on /api/hosts/rpc) throug
 Arrakis runs `orb` on that host: the whole machine API (app/api/vms.py) then works for
 its OrbStack too, at /api/hosts/<id>/vms. That is full control of the host's machines,
 and through them of the host, so it only runs for hosts whose owner switched on
-"Manage OrbStack from the dashboard" (orb_manage in ~/.homelab_hosts.json). The agent
+"Manage OrbStack from the dashboard" (orb_manage in $HOMELAB_HOME/secrets/hosts.json). The agent
 only ever runs `orb`, never anything else.
 """
 from flask import Blueprint, jsonify, request, Response
@@ -43,15 +43,17 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
 from app.core.logger import log
+from app.core import paths
+from app.core import server_cfg
 
 hosts_bp = Blueprint('hosts', __name__)
 
-STORE = os.path.expanduser('~/.homelab_hosts.json')
+STORE = paths.secret('hosts')
 NAME_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9 ._-]{0,40}$')
 REPORT_EVERY = 5
 ONLINE_WITHIN = 20          # seconds since the last report
 HISTORY_KEEP = 720          # one hour of 5 s reports
-PORT = int(os.environ.get('PORT', 5050))
+PORT = int(os.environ.get('PORT') or server_cfg.port())
 
 _lock = threading.Lock()
 _latest = {}                # host id -> parsed report
@@ -856,7 +858,7 @@ def _dns(ip, port):
     if rcode == 2:
         return False, 'DNS answers SERVFAIL (its upstream may be down)', ms
     if rcode == 5:
-        return True, 'DNS answers, but refuses queries from Arrakis', ms
+        return True, f'DNS answers, but refuses queries from {server_cfg.name()}', ms
     return True, 'answers DNS', ms
 
 
@@ -1002,7 +1004,7 @@ def add_host():
         return jsonify({"status": "error", "message": "Use letters, digits, spaces, dots, dashes or underscores (up to 41)."}), 400
     with _lock:
         hosts = _load()
-        if name.lower() == 'arrakis' or any(h['name'].lower() == name.lower() for h in hosts):
+        if name.lower() in ('arrakis', server_cfg.name().lower()) or any(h['name'].lower() == name.lower() for h in hosts):
             return jsonify({"status": "error", "message": f"A host called {name} already exists."}), 409
         slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-') or 'host'
         # ids share the #infra/<id> route with the tree's own nodes

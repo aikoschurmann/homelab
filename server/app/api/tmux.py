@@ -8,6 +8,7 @@ from app.core.logger import log
 from app.core.cache import global_state
 from app.services.poller import refresh_tmux_cache
 from app.core.config import VM_CMD_PREFIX
+from app.core import paths
 
 tmux_bp = Blueprint('tmux', __name__)
 
@@ -213,7 +214,7 @@ def tmux_scrollback(session):
 # ---- saved commands ----------------------------------------------------------------------------
 import os
 import json
-PRESETS = os.path.expanduser('~/.homelab_terminal_presets.json')
+PRESETS = paths.state('terminal_presets')
 
 
 def _load_presets():
