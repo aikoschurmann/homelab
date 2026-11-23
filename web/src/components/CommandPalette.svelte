@@ -20,7 +20,7 @@
     // ---- commands -----------------------------------------------------------------------
     const PAGES = [
         ['Overview', 'overview', Activity], ['Infrastructure', 'infra', Server], ['OrbStack VM', 'infra/arrakis/vm', Boxes], ['macOS apps', 'infra/arrakis/apps', Box],
-        ['Tailscale', 'tailscale', Network], ['Cloudflare', 'cloudflare', Cloud], ['Uptime', 'uptime', HeartPulse], ['Databases', 'databases', Database], ['Backups', 'backups', Archive],
+        ['Tailscale', 'tailscale', Network], ['Cloudflare', 'cloudflare', Cloud], ['Uptime', 'tools/uptime', HeartPulse], ['Databases', 'databases', Database], ['Backups', 'backups', Archive],
         ['Terminal', 'terminal', Terminal], ['API endpoints', 'endpoints', Eye], ['Settings', 'settings', Settings],
     ];
     // the Terminal page opens its "New session" dialog; it may not be mounted yet, so

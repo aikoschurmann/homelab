@@ -1,12 +1,13 @@
 <script>
     import { SN } from '../lib/server.js';
     import { onMount } from 'svelte';
-    import { Archive, Trash2, Plus, Download, FolderOpen, Loader2, ExternalLink, Settings2, X } from 'lucide-svelte';
+    import { Archive, Trash2, Plus, Download, FolderOpen, Loader2, ExternalLink, Settings2, X, FolderSearch } from 'lucide-svelte';
     import { visible } from '../lib/stores.js';
     import { backups, fetchBackups, snapLabel } from '../lib/backups.js';
     import Tabs from './ui/Tabs.svelte';
     import ActionMenu from './ui/ActionMenu.svelte';
     import Modal from './ui/Modal.svelte';
+    import SnapshotBrowser from './SnapshotBrowser.svelte';
 
     // Routes: #backups (snapshots), #backups/coverage, #backups/runs, #backups/<timestamp>.
     // What and when to back up is in Settings → Backups. Parts and their names come from
@@ -46,6 +47,8 @@
     $: tab = PAGES.includes(section) ? section : 'snapshots';
     $: snap = section && !PAGES.includes(section) ? snaps.find(s => s.timestamp === section) : null;
     $: lastRun = runs?.[0];
+    let browsing = null;          // the part whose files are open below the parts list
+    $: if (!snap) browsing = null;
 
     // ---- formatting ----------------------------------------------------------------------
     function fmtSize(b) {
@@ -217,13 +220,16 @@
                                     <td class="strong">{f.label}</td>
                                     <td class="c-md ui-mono dim trunc" title={f.name}>{f.name}</td>
                                     <td class="r num">{#if f.size_bytes}{fmtSize(f.size_bytes)}{:else}<span class="bad">failed</span>{/if}</td>
-                                    <td>{#if f.size_bytes}<a class="ui-btn sm" href="/api/backups/file/{f.name}" download><Download size={13} /> Download</a>{/if}</td>
+                                    <td>{#if f.size_bytes}<span class="ui-btns"><button class="ui-btn sm" class:on={browsing?.name === f.name} on:click={() => browsing = browsing?.name === f.name ? null : f}><FolderSearch size={13} /> Browse</button><a class="ui-btn sm" href="/api/backups/file/{f.name}" download><Download size={13} /> Download</a></span>{/if}</td>
                                 </tr>
                             {/each}
                         </tbody>
                     </table>
                 </div>
             </section>
+            {#if browsing}
+                {#key browsing.name}<SnapshotBrowser ts={snap.timestamp} part={browsing.component} label={browsing.label} when={fmtDate(snap.created)} onClose={() => browsing = null} />{/key}
+            {/if}
         {/if}
     {:else}
         <div class="ui-head">

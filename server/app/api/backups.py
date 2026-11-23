@@ -601,3 +601,69 @@ def backup_coverage():
         log.warning(f"coverage hosts: {e}")
     return jsonify({"status": "success", "data": {
         "groups": groups, "dest": cfg["dest"], "copy_to": cfg["copy_to"], "copy": backup_cfg.copy_status()}})
+
+
+# ---- browse and restore (app/services/restore.py) -------------------------------------------
+@backups_bp.route('/<timestamp>/parts/<part>/files', methods=['GET'])
+def snapshot_files(timestamp, part):
+    from app.services import restore
+    path = restore.archive(timestamp, part)
+    if not path:
+        return jsonify({"status": "error", "message": "That part of the snapshot isn't there"}), 404
+    prefix = request.args.get('path', '')
+    try:
+        entries = restore.listing(path, prefix)
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Could not read the archive: {e}"}), 500
+    if entries is None:
+        return jsonify({"status": "error", "message": "No such folder in this archive"}), 404
+    t = restore.target(part)
+    return jsonify({"status": "success", "data": {"path": restore._clean(prefix), "entries": entries,
+        "target": {k: t.get(k) for k in ('where', 'label', 'root', 'why')}}})
+
+
+@backups_bp.route('/<timestamp>/parts/<part>/download', methods=['GET'])
+def snapshot_file_download(timestamp, part):
+    from flask import Response
+    from app.services import restore
+    path = restore.archive(timestamp, part)
+    member = request.args.get('path', '')
+    if not path or not member:
+        return jsonify({"status": "error", "message": "Not found"}), 404
+    tf, f, size = restore.open_file(path, member)
+    if not f:
+        return jsonify({"status": "error", "message": "Only single files can be downloaded; restore a folder as a copy"}), 404
+    def stream():
+        try:
+            while True:
+                chunk = f.read(1 << 16)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            tf.close()
+    name = os.path.basename(member.rstrip('/')).replace('"', '')
+    return Response(stream(), mimetype='application/octet-stream', headers={
+        "Content-Disposition": f'attachment; filename="{name}"', "Content-Length": str(size)})
+
+
+@backups_bp.route('/<timestamp>/restore', methods=['POST'])
+def snapshot_restore(timestamp):
+    from app.services import restore
+    body = request.get_json(silent=True) or {}
+    paths = body.get('paths') or ['']
+    if not isinstance(paths, list) or not all(isinstance(p, str) for p in paths):
+        return jsonify({"status": "error", "message": "paths must be a list of strings"}), 400
+    j, err = restore.start(timestamp, body.get('part', ''), paths, body.get('mode', 'copy'))
+    if err:
+        return jsonify({"status": "error", "message": err}), 400
+    return jsonify({"status": "success", "data": j})
+
+
+@backups_bp.route('/restores/<jid>', methods=['GET'])
+def restore_job(jid):
+    from app.services import restore
+    j = restore.job(jid)
+    if not j:
+        return jsonify({"status": "error", "message": "No such restore"}), 404
+    return jsonify({"status": "success", "data": j})

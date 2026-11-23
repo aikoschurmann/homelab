@@ -6,6 +6,7 @@
     import { onMount } from 'svelte';
     import { Play, Loader2, RotateCw, ChevronDown, Check } from 'lucide-svelte';
     import Tabs from './ui/Tabs.svelte';
+    import UptimeTab from './UptimeTab.svelte';
     import CopyText from './ui/CopyText.svelte';
     import { Box } from 'lucide-svelte';
     import { tailnet, fetchTailnet, isShared } from '../lib/tailscale.js';
@@ -16,8 +17,8 @@
     export let section = null;
     export let onNavigate = () => {};
 
-    $: tab = ['speed', 'computers', 'api'].includes(section) ? section : 'checks';
-    const TABS = [{ id: 'checks', label: 'Checks' }, { id: 'speed', label: 'Speed test' }, { id: 'computers', label: 'Computers' }, { id: 'api', label: 'API health' }];
+    $: tab = ['uptime', 'speed', 'computers', 'api'].includes(section) ? section : 'checks';
+    const TABS = [{ id: 'checks', label: 'Checks' }, { id: 'uptime', label: 'Uptime' }, { id: 'speed', label: 'Speed test' }, { id: 'computers', label: 'Computers' }, { id: 'api', label: 'API health' }];
 
     const toast = (m) => window.showToast?.(m);
     const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) }).then(r => r.json());
@@ -444,6 +445,8 @@
                 <div class="ui-empty">Loading the endpoint list…</div>
             {/if}
         </section>
+    {:else if tab === 'uptime'}
+        <UptimeTab embedded />
     {/if}
 </div>
 

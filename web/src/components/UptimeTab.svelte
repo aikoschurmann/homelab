@@ -8,7 +8,9 @@
     import ActionMenu from './ui/ActionMenu.svelte';
     import Modal from './ui/Modal.svelte';
 
-    // Websites and services fetched on a schedule from this server, with HTTPS certificate expiry
+    // Websites and services fetched on a schedule from this server, with HTTPS certificate expiry.
+    // A tab of Network tools (embedded): no page header, Add check sits in the list bar.
+    export let embedded = false;
     let data = null, error = '';
     async function load() {
         try {
@@ -78,11 +80,13 @@
     ];
 </script>
 
-<div class="ui-page">
+<div class:ui-page={!embedded} class:inner={embedded}>
+    {#if !embedded}
     <div class="ui-head">
         <div><h1>Uptime</h1><p>Websites and services checked from {SN} on a schedule, with HTTPS certificate expiry.</p></div>
         <div class="ui-head-actions"><button class="ui-btn primary" on:click={() => edit()}><Plus size={15} /> Add check</button></div>
     </div>
+    {/if}
 
     {#if !data}
         <div class="ui-dim">{error || 'Loading…'}</div>
@@ -109,6 +113,7 @@
                 <button class:on={filter === 'down'} on:click={() => filter = 'down'}>Down <span class="n">{downCount}</span></button>
             </div>
             <span class="ui-count">{shown.length} {shown.length === 1 ? 'check' : 'checks'}</span>
+            {#if embedded}<button class="ui-btn primary" on:click={() => edit()}><Plus size={14} /> Add check</button>{/if}
         </div>
 
         <section class="ui-card">
@@ -134,10 +139,13 @@
                                     {:else if cd != null}<span class:warn={cd < data.cert_warn_days}>{days(cd)}</span><div class="sub">{c.cert.issuer || ''}</div>
                                     {:else}<span class="ui-dim">{c.url.startsWith('https') ? '—' : 'No HTTPS'}</span>{/if}
                                 </td>
-                                <td on:click|stopPropagation role="presentation">
+                                <td>
+                                    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                                    <span on:click|stopPropagation>
                                     {#if confirmDel?.id === c.id}
                                         <span class="ui-btns"><button class="ui-btn sm" on:click={() => confirmDel = null}>Keep</button><button class="ui-btn sm danger" on:click={() => del(c)}>Remove</button></span>
                                     {:else}<ActionMenu items={menu(c)} label="Actions for {c.name}" />{/if}
+                                    </span>
                                 </td>
                             </tr>
                         {:else}<tr><td colspan="7" class="ui-dim">No checks match.</td></tr>{/each}
@@ -178,6 +186,7 @@
 </Modal>
 
 <style>
+    .inner { display: flex; flex-direction: column; gap: 20px; }
     .nm { font-weight: 600; color: var(--accent); }
     tr.click:hover .nm { text-decoration: underline; }
     .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
