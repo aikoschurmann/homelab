@@ -998,6 +998,7 @@ ROUTE_DOCS = {
     "GET /api/updates": "Outdated packages per computer, and update jobs in progress",
     "POST /api/updates/check": "Look for updates again now (all, or one target)",
     "POST /api/updates/{tid}/apply": "Upgrade a computer's packages (all, or the ones listed)",
+    "POST /api/hosts/{hid}/wake": "Wake-on-LAN: send the magic packet to a host's learned MAC address",
     "GET /api/log_error": "Record a front-end error in the backend log",
     "POST /api/prefs": "Save dashboard preferences",
     "GET /api/stats_stream": "Live stats as Server-Sent Events",

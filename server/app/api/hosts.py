@@ -267,6 +267,7 @@ def _public(h):
         r = _latest.get(h['id'])
     seen = r and r['at']
     out = {k: h[k] for k in ('id', 'name', 'added')}
+    out["mac"], out["lan_ip"] = h.get('mac'), h.get('lan_ip')
     out["orb_manage"] = bool(h.get('orb_manage'))
     out["rpc"] = _rpc_connected(h['id'])
     out["online"] = bool(seen and time.time() - seen < ONLINE_WITHIN)
@@ -519,6 +520,23 @@ def _sections(text):
     if name is not None:
         out[name] = '\n'.join(buf)
     return out
+
+
+@hosts_bp.route('/<hid>/wake', methods=['POST'])
+def wake_host(hid):
+    """Wake-on-LAN: the magic packet to the MAC address learned while the host was online."""
+    from app.services import wol
+    h = next((x for x in _load() if x['id'] == hid), None)
+    if not h:
+        return jsonify({"status": "error", "message": "No such host"}), 404
+    if not h.get('mac'):
+        return jsonify({"status": "error", "message": f"{h['name']}'s network address isn't known yet: it is learned while it's online on this LAN"}), 400
+    try:
+        sent = wol.wake(h['mac'], h.get('lan_ip'))
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    log.info(f"wake-on-lan {h['name']} {h['mac']} -> {sent}")
+    return jsonify({"status": "success", "data": {"mac": h['mac'], "sent_to": sent}})
 
 
 @hosts_bp.route('/hidtemps', methods=['GET'])

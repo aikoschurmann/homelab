@@ -218,7 +218,12 @@
     const stateLabel = { queued: 'Waiting for the agent', sent: 'Running', done: 'Done', failed: 'Failed', expired: 'Not picked up', unknown: 'No answer' };
     const statePill = { queued: 'waiting', sent: 'starting', done: 'running', failed: 'error', expired: 'stopped', unknown: 'stopped' };
 
+    async function wakeUp() {
+        const r = await fetch(`/api/hosts/${encodeURIComponent(h.id)}/wake`, { method: 'POST' }).then(r => r.json()).catch(() => null);
+        toast(r?.status === 'success' ? `Wake-up sent to ${h.name} (${r.data.mac})` : r?.message || 'Could not send the wake-up');
+    }
     $: menuItems = [
+        !h.online && h.mac && { label: 'Wake up', icon: Power, onClick: wakeUp },
         actOk && { label: 'Update agent', icon: Download, onClick: () => act('update-agent') },
         actOk && { label: 'Reboot…', icon: Power, danger: true, onClick: () => act('reboot') },
         { label: 'Agent install command', icon: Terminal, onClick: () => setTab('settings') },

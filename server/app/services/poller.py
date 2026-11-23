@@ -250,6 +250,8 @@ def start_all_pollers():
     uptime.start()
     from app.api import updates
     updates.start()
+    from app.services import wol
+    wol.start()
 
 def docker_events_loop():
     last_update = 0

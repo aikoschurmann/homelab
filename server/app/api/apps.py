@@ -21,27 +21,47 @@ _docker = {}         # machine -> (time, has docker)
 DIGEST_EVERY = 6 * 3600
 
 
+MAC = 'mac'           # this Mac's own Docker (OrbStack's engine), stacks under $HOMELAB_HOME/stacks
+
+
 def _orb(machine, script, *args, timeout=60, stdin=None):
-    return subprocess.run(['orb', '-m', machine, '-u', 'root', 'sh', '-c', script, 'sh', *args],
+    """Run a script as root in a machine, or on the Mac for MAC; $STACKS is where stacks live."""
+    if machine == MAC:
+        from app.core import paths
+        import os
+        env = {**os.environ, 'PATH': '/usr/local/bin:/opt/homebrew/bin:' + os.environ.get('PATH', '')}
+        return subprocess.run(['sh', '-c', f'STACKS="{paths.HOME}/stacks"\n' + script, 'sh', *args],
+                              input=stdin, capture_output=True, text=True, timeout=timeout, env=env)
+    return subprocess.run(['orb', '-m', machine, '-u', 'root', 'sh', '-c', 'STACKS=/opt/stacks\n' + script, 'sh', *args],
                           input=stdin, capture_output=True, text=True, timeout=timeout)
 
 
-def machines():
-    """Running machines that have Docker."""
+def _has_docker(t):
+    hit = _docker.get(t)
+    if not hit or time.time() - hit[0] > 300:
+        ok = _orb(t, 'command -v docker >/dev/null && docker info >/dev/null 2>&1', timeout=20).returncode == 0
+        _docker[t] = hit = (time.time(), ok)
+    return hit[1]
+
+
+def targets():
+    """Where apps can go: this Mac's Docker, and every running machine ({"id", "name", "docker"})."""
+    from app.core import server_cfg
+    out = []
+    if _has_docker(MAC):
+        out.append({"id": MAC, "name": server_cfg.name(), "kind": "mac", "docker": True})
     try:
-        out = subprocess.run(['orb', 'list', '-f', 'json'], capture_output=True, text=True, timeout=10).stdout
-        names = [m['name'] for m in json.loads(out or '[]') if m.get('state') == 'running']
+        ms = subprocess.run(['orb', 'list', '-f', 'json'], capture_output=True, text=True, timeout=10).stdout
+        names = [m['name'] for m in json.loads(ms or '[]') if m.get('state') == 'running']
     except Exception:
-        return []
-    res = []
-    for n in names:
-        hit = _docker.get(n)
-        if not hit or time.time() - hit[0] > 300:
-            ok = _orb(n, 'command -v docker >/dev/null && docker info >/dev/null 2>&1', timeout=20).returncode == 0
-            _docker[n] = hit = (time.time(), ok)
-        if hit[1]:
-            res.append(n)
-    return res
+        names = []
+    out += [{"id": n, "name": n, "kind": "machine", "docker": _has_docker(n)} for n in names]
+    return out
+
+
+def machines():
+    """Targets that have Docker now."""
+    return [t['id'] for t in targets() if t['docker']]
 
 
 # ---- registry digests ------------------------------------------------------------------------
@@ -172,10 +192,24 @@ def _run(j, machine, script, *args, stdin=None, timeout=1800):
     _digests.clear()
 
 
+# Docker for a machine that hasn't got it: Alpine's packages, else Docker's own install script
+_DOCKER_SH = r'''set -e
+if command -v apk >/dev/null; then
+  apk add --no-cache docker docker-cli-compose
+  rc-update add docker default 2>/dev/null || true
+  rc-service docker start 2>/dev/null || service docker start
+else
+  command -v curl >/dev/null || { (apt-get update -qq && apt-get install -y curl) || dnf -y install curl; }
+  curl -fsSL https://get.docker.com | sh
+  systemctl enable --now docker 2>/dev/null || service docker start
+fi
+for i in $(seq 1 20); do docker info >/dev/null 2>&1 && exit 0; sleep 1; done
+echo "Docker didn't start" >&2; exit 1'''
+
 _INSTALL_SH = r'''set -e
-mkdir -p "/opt/stacks/$1"
-cd "/opt/stacks/$1"
-[ -e compose.yml ] && { echo "/opt/stacks/$1 already exists" >&2; exit 1; }
+mkdir -p "$STACKS/$1"
+cd "$STACKS/$1"
+[ -e compose.yml ] && { echo "$STACKS/$1 already exists" >&2; exit 1; }
 cat > compose.yml
 : > .installed-by-dashboard
 docker compose up -d 2>&1'''
@@ -190,7 +224,7 @@ case "$act" in
   restart) docker compose -p "$p" "$@" restart 2>&1 ;;
   remove) docker compose -p "$p" "$@" down 2>&1 &&
     # a folder the dashboard made for this app goes too (its data is in named volumes, which stay)
-    if [ -f "/opt/stacks/$p/.installed-by-dashboard" ]; then rm -f "/opt/stacks/$p/compose.yml" "/opt/stacks/$p/.installed-by-dashboard"; rmdir "/opt/stacks/$p" 2>/dev/null; fi; true ;;
+    if [ -f "$STACKS/$p/.installed-by-dashboard" ]; then rm -f "$STACKS/$p/compose.yml" "$STACKS/$p/.installed-by-dashboard"; rmdir "$STACKS/$p" 2>/dev/null; fi; true ;;
 esac'''
 
 
@@ -199,7 +233,7 @@ esac'''
 def catalog():
     return jsonify({"status": "success", "data": {
         "apps": [{k: a[k] for k in ('id', 'name', 'category', 'port', 'icon', 'desc')} for a in APPS],
-        "machines": machines()}})
+        "targets": targets()}})
 
 
 @apps_bp.route('/installed', methods=['GET'])
@@ -219,14 +253,16 @@ def install():
     app, machine = BY_ID.get(b.get('app')), b.get('machine')
     if not app:
         return jsonify({"status": "error", "message": "Unknown app"}), 404
-    if machine not in machines():
-        return jsonify({"status": "error", "message": "Pick a running machine that has Docker"}), 400
+    tg = next((t for t in targets() if t['id'] == machine), None)
+    if not tg:
+        return jsonify({"status": "error", "message": "Pick this Mac or a running machine"}), 400
     try:
         port = int(b.get('port') or app['port'])
         assert 1 <= port <= 65535
     except (ValueError, AssertionError):
         return jsonify({"status": "error", "message": "Port must be 1 to 65535"}), 400
-    busy = _orb(machine, "ss -ltnH 2>/dev/null | awk '{print $4}' | sed 's/.*://' || netstat -ltn | awk 'NR>2 {print $4}' | sed 's/.*://'", timeout=15).stdout.split()
+    busy = _orb(machine, "lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | awk 'NR>1 {print $9}' | sed 's/.*://'" if machine == MAC else
+                "ss -ltnH 2>/dev/null | awk '{print $4}' | sed 's/.*://' || netstat -ltn | awk 'NR>2 {print $4}' | sed 's/.*://'", timeout=15).stdout.split()
     if str(port) in busy:
         return jsonify({"status": "error", "message": f"Port {port} is already in use in {machine}"}), 409
     try:
@@ -234,8 +270,17 @@ def install():
     except Exception:
         tz = 'UTC'
     compose = app['compose'].format(port=port, secret=secrets.token_urlsafe(24), tz=tz)
-    j = _job(kind='install', app=app['id'], name=app['name'], machine=machine, port=port)
-    threading.Thread(target=_run, args=(j, machine, _INSTALL_SH, app['id']), kwargs={"stdin": compose}, daemon=True).start()
+    j = _job(kind='install', app=app['id'], name=app['name'], machine=machine, port=port, docker_first=not tg['docker'])
+    def go():
+        if not tg['docker']:
+            j['step'] = 'Installing Docker'
+            _run(j, machine, _DOCKER_SH, timeout=900)
+            _docker.pop(machine, None)
+            if j['state'] != 'done':
+                return
+            j.update(state='running', step=None)
+        _run(j, machine, _INSTALL_SH, app['id'], stdin=compose)
+    threading.Thread(target=go, daemon=True).start()
     return jsonify({"status": "success", "data": j})
 
 
