@@ -59,7 +59,7 @@ KIND_COLOUR = {
 CATEGORY_LABEL = {
     'daemon': 'Host daemon', 'container': 'Container', 'health': 'Health check', 'disk': 'Disk',
     'host': 'Host', 'machine': 'Machine', 'drive': 'Drive', 'backup': 'Backup',
-    'site': 'Website', 'cert': 'Certificate',
+    'site': 'Website', 'cert': 'Certificate', 'temp': 'Temperature', 'smart': 'Drive health', 'ups': 'Power',
 }
 
 # Shared between the polling loop and dashboard actions so a condition is only reported once
@@ -323,6 +323,18 @@ def _backup_problems():
     return problems
 
 
+def _hardware_problems():
+    from app.services import hardware
+    from app.api.hosts import _load, hardware_of
+    out = hardware.problems_of(server_cfg.name(), hardware.local())
+    for h in _load():
+        try:
+            out.update(hardware.problems_of(h['name'], hardware_of(h['id'])))
+        except Exception:
+            pass
+    return out
+
+
 def _uptime_problems():
     from app.services import uptime
     return uptime.problems()
@@ -331,7 +343,8 @@ def _uptime_problems():
 def all_problems(stats, disk_threshold, host_grace=None):
     problems = current_problems(stats, disk_threshold)
     for check in (lambda: _host_problems(disk_threshold, host_grace), _machine_problems,
-                  lambda: _drive_problems(disk_threshold), _backup_problems, _uptime_problems):
+                  lambda: _drive_problems(disk_threshold), _backup_problems, _uptime_problems,
+                  _hardware_problems):
         try:
             problems.update(check())
         except Exception as e:
@@ -342,7 +355,7 @@ def all_problems(stats, disk_threshold, host_grace=None):
 ALERT_TITLES = {
     'daemon': 'Daemon down', 'container': 'Container stopped', 'health': 'Container unhealthy', 'disk': 'Disk almost full',
     'host': 'Host offline', 'machine': 'Machine down', 'drive': 'Drive problem', 'backup': 'Backup problem',
-    'site': 'Website down', 'cert': 'Certificate expiring',
+    'site': 'Website down', 'cert': 'Certificate expiring', 'temp': 'Running hot', 'smart': 'Drive failing', 'ups': 'On UPS battery',
 }
 
 
@@ -381,7 +394,7 @@ def notify_action(category, target, action, ok=True, error=None):
 ALERT_TITLES = {
     'daemon': 'Daemon down', 'container': 'Container stopped', 'health': 'Container unhealthy', 'disk': 'Disk almost full',
     'host': 'Host offline', 'machine': 'Machine down', 'drive': 'Drive problem', 'backup': 'Backup problem',
-    'site': 'Website down', 'cert': 'Certificate expiring',
+    'site': 'Website down', 'cert': 'Certificate expiring', 'temp': 'Running hot', 'smart': 'Drive failing', 'ups': 'On UPS battery',
 }
 
 

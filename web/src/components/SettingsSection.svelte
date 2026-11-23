@@ -59,6 +59,9 @@
         ['backup', 'Backups', 'A backup is overdue or incomplete'],
         ['site', 'Websites', 'An uptime check stops answering'],
         ['cert', 'Certificates', 'An HTTPS certificate expires within 14 days'],
+        ['temp', 'Temperature', 'A CPU or SSD runs hot'],
+        ['smart', 'Drive health', 'A drive reports failing or bad sectors'],
+        ['ups', 'Power', 'A computer switches to UPS battery'],
     ];
     const allKinds = () => Object.fromEntries(KINDS.map(([k]) => [k, true]));
     let alerts = { enabled: false, discord: '', ntfy: '', tgToken: '', tgChat: '', poUser: '', poToken: '', hook: '', mHost: '', mPort: 587, mUser: '', mPass: '', mTo: '', disk: 90, kinds: allKinds(), repeat: 6, grace: 60, resolved: true, actions: true, quiet: false, qFrom: 23, qTo: 8 };

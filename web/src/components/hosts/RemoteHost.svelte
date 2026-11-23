@@ -14,6 +14,7 @@
     import { href } from '../../lib/infra.js';
     import { vmRef } from '../../lib/vmref.js';
     import MachineList from '../machines/MachineList.svelte';
+    import HardwareCard from './HardwareCard.svelte';
     import { fmtMb } from '../../lib/services.js';
     import StatusPill from '../ui/StatusPill.svelte';
     import ActionMenu from '../ui/ActionMenu.svelte';
@@ -325,6 +326,8 @@
                 {/each}
             </div>
         </section>
+
+        <HardwareCard hid={h.id} name={h.name} agentOld={+(r.agent || 0) < 14} />
 
         <section class="ui-card">
             <div class="ui-card-head"><div><h2 class="ui-card-title">Details</h2><p class="ui-card-desc">The hardware, and how to reach it.</p></div></div>

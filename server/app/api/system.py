@@ -953,12 +953,13 @@ GROUP_DOCS = {
     "Terminal": "tmux sessions on the Mac and in machines.",
     "Tools": "Small utilities like ping and port checks.",
     "Uptime": "Websites and services checked on a schedule, with certificate expiry.",
+    "Hardware": "Temperatures, drive health (SMART) and UPS power, of this server and other hosts.",
     "Dashboard": "The dashboard's own data: stats stream, history, preferences and this catalog.",
     "Internal": "Plumbing for the agent, live streams and the terminal. Not meant to be called by hand.",
 }
 _BP_GROUP = {"vms": "Machines", "hosts": "Hosts", "compute": "Compute", "storage": "Storage", "tailscale": "Tailscale",
              "databases": "Databases", "backups": "Backups", "tmux": "Terminal", "services": "Services",
-             "uptime": "Uptime"}
+             "uptime": "Uptime", "hardware": "Hardware"}
 
 
 # Descriptions for routes whose view has no docstring (keyed "METHOD path").
@@ -987,6 +988,8 @@ ROUTE_DOCS = {
     "PUT /api/uptime/{cid}": "Change an uptime check",
     "DELETE /api/uptime/{cid}": "Remove an uptime check and its history",
     "POST /api/uptime/{cid}/run": "Run an uptime check now",
+    "GET /api/hardware": "This server's temperatures, drive health and power source",
+    "GET /api/hardware/{hid}": "The same for another host, from its agent's last inventory",
     "GET /api/log_error": "Record a front-end error in the backend log",
     "POST /api/prefs": "Save dashboard preferences",
     "GET /api/stats_stream": "Live stats as Server-Sent Events",

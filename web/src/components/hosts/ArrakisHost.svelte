@@ -22,6 +22,7 @@
     import LiveChart from '../ui/LiveChart.svelte';
     import PairGrid from '../ui/PairGrid.svelte';
     import MachineList from '../machines/MachineList.svelte';
+    import HardwareCard from './HardwareCard.svelte';
     import StorageView from './StorageView.svelte';
     import OrbStackSettings from '../machines/OrbStackSettings.svelte';
 
@@ -205,6 +206,8 @@
                 {/each}
             </div>
         </section>
+
+        <HardwareCard />
 
         <section class="ui-card">
             <div class="ui-card-head"><div><h2 class="ui-card-title">Details</h2><p class="ui-card-desc">The hardware, and how to reach it.</p></div></div>

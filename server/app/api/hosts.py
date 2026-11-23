@@ -336,7 +336,7 @@ VERBS = {
 VERB_FROM = {**{v: 5 for v in ('vm-start', 'vm-stop', 'vm-restart', 'disk-eject', 'volume-mount')},
              'backup-folders': 8, 'backup': 9, 'backup-sizes': 13}
 NO_TARGET = {'reboot', 'update-agent', 'backup-folders', 'backup-sizes'}
-AGENT_VERSION = 13          # what install.sh hands out now; bump with every change to AGENT_SH
+AGENT_VERSION = 14          # what install.sh hands out now; bump with every change to AGENT_SH
 BACKUP_FROM = 9             # first agent version that sends folders for the nightly backup (8 had a bug)
 BACKUP_TTL = 3 * 3600       # a big folder can take a while to pack and send
 TARGET_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9@._:_-]{0,127}$')
@@ -546,6 +546,12 @@ def _built(hid, key, build):
             log.warning(f"host {hid} {key}: {e}")
             inv["built"][key] = None
     return inv["built"][key]
+
+
+def hardware_of(hid):
+    """Temperatures, drive health and UPS from a host's last inventory (agent 14+ for Linux sensors)."""
+    from app.services.hardware import from_inventory
+    return _built(hid, "hardware", lambda sections, at: {**from_inventory(sections), "at": int(at)})
 
 
 def _disks_of(hid):
@@ -1187,6 +1193,31 @@ inventory() {
     lsblk -J -b -o NAME,SIZE,TYPE,VENDOR,MODEL,TRAN,RM,HOTPLUG,ROTA,RO,MOUNTPOINT,FSTYPE,LABEL,FSAVAIL,FSUSED 2>/dev/null \
       || lsblk -J -b -o NAME,SIZE,TYPE,MODEL,RM,RO,MOUNTPOINT,FSTYPE,LABEL 2>/dev/null
     echo "#@df"; df -Pk 2>/dev/null
+  fi
+  # hardware health: temperatures, drive SMART (needs root and smartctl), UPS (NUT's upsc)
+  if [ "$OS_KIND" = Darwin ]; then
+    echo "#@pmset ps"; pmset -g ps 2>/dev/null
+  else
+    echo "#@temps"
+    for z in /sys/class/thermal/thermal_zone*; do
+      [ -r "$z/temp" ] && echo "$(cat "$z/type" 2>/dev/null) $(cat "$z/temp" 2>/dev/null)"
+    done
+    for d in /sys/class/hwmon/hwmon*; do
+      n=$(cat "$d/name" 2>/dev/null)
+      for t in "$d"/temp*_input; do
+        [ -r "$t" ] || continue
+        l=$(cat "${t%_input}_label" 2>/dev/null)
+        echo "$n ${l:-$(basename "$t" _input)} $(cat "$t" 2>/dev/null)"
+      done
+    done
+    if [ "$IS_ROOT" = 1 ] && command -v smartctl >/dev/null 2>&1 && command -v lsblk >/dev/null 2>&1; then
+      for dev in $(lsblk -dno NAME,TYPE 2>/dev/null | awk '$2 == "disk" {print $1}'); do
+        echo "#@smart /dev/$dev"; smartctl -j -H -A -i "/dev/$dev" 2>/dev/null
+      done
+    fi
+  fi
+  if command -v upsc >/dev/null 2>&1; then
+    for u in $(upsc -l 2>/dev/null); do echo "#@upsc $u"; upsc "$u" 2>/dev/null; done
   fi
   if command -v orb >/dev/null 2>&1; then
     if orb status 2>/dev/null | grep -qi running; then
