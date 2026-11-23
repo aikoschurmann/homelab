@@ -38,7 +38,8 @@
     }));
     // power goes in the footer: it is neither a temperature nor a drive
     $: ups = hw?.power?.ups?.[0];
-    $: onBattery = hw?.power?.source === 'ups' || hw?.power?.source === 'battery';
+    // only a UPS on battery is a worry (the power is out); a laptop on its own battery is normal
+    $: onBattery = hw?.power?.source === 'ups';
     $: power = !hw?.power?.source ? null : ups
         ? [hw.power.source === 'ups' ? 'On UPS battery' : 'On mains power', `UPS ${ups.name}`, ups.pct != null ? `${ups.pct}% charged` : null, ups.remaining ? `${ups.remaining} left` : null].filter(Boolean).join(' · ')
         : hw.power.source === 'battery' ? 'On battery power' : 'On mains power · no UPS connected';
@@ -52,7 +53,7 @@
     {#if !hw}
         <div class="ui-empty">Reading…</div>
     {:else if empty}
-        <div class="ui-empty">{agentOld ? `Update ${name}'s agent (⋯ → Update agent) so it reports temperatures, drive health and UPS power.` : 'Nothing reported yet.'}</div>
+        <div class="ui-empty">{agentOld ? `Update ${name}'s agent (⋯ → Update agent) so it reports temperatures, drive health and UPS power.` : hid ? `Waiting for ${name}'s next report; it sends one every minute.` : 'Nothing reported yet.'}</div>
     {:else}
         <PairGrid {rows} heads={['Temperatures', 'Drives']} />
         {#if power}<div class="ui-card-foot"><span class:bad={onBattery}>{power}</span></div>{/if}

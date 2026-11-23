@@ -4,15 +4,17 @@
     import { SN } from '../lib/server.js';
 
     // One search across every container's logs (all running OrbStack machines) and the Mac
-    // apps' log files, newest first.
-    let sources = null, q = '', since = '1h', problems = false, source = '', regex = false;
+    // apps' log files, newest first. A search starting with / is a pattern (regex).
+    let sources = null, q = '', since = '1h', problems = false, source = '';
     let data = null, error = '', loading = false, seq = 0;
-    const WINDOWS = [['15m', '15 min'], ['1h', '1 hour'], ['6h', '6 hours'], ['24h', '24 hours'], ['7d', '7 days']];
+    const WINDOWS = [['15m', '15 min'], ['1h', '1 h'], ['6h', '6 h'], ['24h', '24 h'], ['7d', '7 days']];
 
+    $: regex = q.startsWith('/') && q.length > 1;
+    $: term = regex ? q.slice(1).replace(/\/$/, '') : q;
     async function search() {
         const my = ++seq;
         loading = true; error = '';
-        const u = new URLSearchParams({ q, since, source, ...(problems ? { problems: '1' } : {}), ...(regex ? { regex: '1' } : {}) });
+        const u = new URLSearchParams({ q: term, since, source, ...(problems ? { problems: '1' } : {}), ...(regex ? { regex: '1' } : {}) });
         try {
             const j = await fetch('/api/logs/search?' + u).then(r => r.json());
             if (my !== seq) return;
@@ -21,25 +23,32 @@
         finally { if (my === seq) loading = false; }
     }
     let timer;
-    // typing waits a moment; switches search at once
-    $: q, regex, (clearTimeout(timer), timer = setTimeout(search, 350));
+    // typing waits a moment; the switches search at once
+    $: term, (clearTimeout(timer), timer = setTimeout(search, 350));
     $: since, problems, source, search();
     onMount(async () => {
         try { const j = await fetch('/api/logs/sources').then(r => r.json()); if (j.status === 'success') sources = j.data; } catch (e) {}
     });
 
-    const time = (t) => t ? new Date(t * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+    const time = (t) => {
+        if (!t) return '—';
+        const d = new Date(t * 1000), today = new Date().toDateString() === d.toDateString();
+        return today ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                     : d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
     const PROBLEM = /\b(error|errors|err|fatal|panic|exception|traceback|fail|failed|failure|critical|crit|warn|warning|denied|refused|timeout|timed out)\b/i;
+    // the time column already says when: drop a timestamp the line starts with
+    const STAMP = /^\s*[[(]?\w?\)?\s*\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\s*(?:Z|[+-]\d{2}:?\d{2})?[\])]?\s*(?:-\s*)?/;
     const esc = (s) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     function mark(line) {
-        const e = esc(line);
-        if (!q) return e;
+        const e = esc(line.replace(STAMP, ''));
+        if (!term) return e;
         try {
-            const rx = new RegExp(regex ? q : q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-            return e.replace(new RegExp(rx.source.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'), 'gi'), m => `<mark>${m}</mark>`);
+            const rx = new RegExp(regex ? term : term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+            // match on the escaped text so a highlight can't break the markup
+            return e.replace(new RegExp(esc(rx.source), 'gi'), m => `<mark>${m}</mark>`);
         } catch (err) { return e; }
     }
-    $: bySource = data ? Object.entries(data.by_source).sort((a, b) => b[1] - a[1]) : [];
 </script>
 
 <div class="ui-page">
@@ -49,26 +58,19 @@
     </div>
 
     <div class="ui-listbar">
-        <label class="ui-search wide"><Search size={14} /><input placeholder={regex ? 'Pattern, e.g. timeout|refused' : 'Search the lines, or a container name'} bind:value={q} spellcheck="false" /></label>
-        <select class="ui-select narrow" bind:value={source} aria-label="Where">
-            <option value="">Everywhere</option>
-            <option value="mac">The Mac's apps</option>
-            {#each sources?.machines || [] as m}<option value={m}>Containers in {m}</option>{/each}
-        </select>
-        <select class="ui-select narrow" bind:value={since} aria-label="How far back">
-            {#each WINDOWS as [v, l]}<option value={v}>Last {l}</option>{/each}
-        </select>
+        <label class="ui-search"><Search size={14} /><input placeholder="Search, or /pattern/" bind:value={q} spellcheck="false" /></label>
+        <div class="ui-seg">{#each WINDOWS as [v, l]}<button class:on={since === v} on:click={() => since = v}>{l}</button>{/each}</div>
         <div class="ui-seg">
-            <button class:on={!problems} on:click={() => problems = false}>All lines</button>
+            <button class:on={!problems} on:click={() => problems = false}>All</button>
             <button class:on={problems} on:click={() => problems = true}>Problems</button>
         </div>
-        <label class="rx"><input type="checkbox" bind:checked={regex} /> Pattern</label>
-        <span class="ui-count">{#if data}{data.total > data.lines.length ? `newest ${data.lines.length} of ${data.total}` : `${data.total} ${data.total === 1 ? 'line' : 'lines'}`} · {data.ms} ms{/if}</span>
+        <span class="ui-count">{#if data}{data.total > data.lines.length ? `newest ${data.lines.length} of ${data.total}` : `${data.total} ${data.total === 1 ? 'line' : 'lines'}`}{/if}</span>
+        <select class="ui-select src" bind:value={source} aria-label="Where">
+            <option value="">Everywhere</option>
+            <option value="mac">Apps on the Mac</option>
+            {#each sources?.machines || [] as m}<option value={m}>Containers in {m}</option>{/each}
+        </select>
     </div>
-
-    {#if bySource.length > 1}
-        <div class="chips">{#each bySource as [s, n]}<button class="chip" on:click={() => q = s}>{s} <span class="n">{n}</span></button>{/each}</div>
-    {/if}
 
     <section class="ui-card">
         {#if error}
@@ -76,42 +78,38 @@
         {:else if !data}
             <div class="ui-empty"><Loader2 size={14} class="ui-spin" /> Searching…</div>
         {:else if !data.lines.length}
-            <div class="ui-empty">{q || problems ? 'Nothing matches in this window.' : 'No log lines in this window.'}</div>
+            <div class="ui-empty">{term || problems ? 'Nothing matches in this window.' : 'No log lines in this window.'}</div>
         {:else}
-            <div class="lines" class:dim={loading}>
-                {#each data.lines as r, i (i)}
-                    <div class="ln" class:bad={PROBLEM.test(r.line)}>
-                        <span class="t">{time(r.t)}</span>
-                        <span class="s" title={r.where === 'mac' ? 'App on the Mac' : `Container in ${r.where}`}>{r.source}</span>
-                        <span class="m">{@html mark(r.line)}</span>
-                    </div>
-                {/each}
+            <div class="ui-tbl-wrap scroll" class:dim={loading}>
+                <table class="ui-tbl">
+                    <thead><tr><th class="shrink">Time</th><th class="shrink c-sm">Source</th><th>Message</th></tr></thead>
+                    <tbody>
+                        {#each data.lines as r, i (i)}
+                            <tr>
+                                <td class="t"><span class="lvl" class:bad={PROBLEM.test(r.line)}></span>{time(r.t)}</td>
+                                <td class="c-sm s" title={r.where === 'mac' ? 'App on the Mac' : `Container in ${r.where}`}>{r.source}</td>
+                                <td class="m">{@html mark(r.line)}</td>
+                            </tr>
+                        {/each}
+                    </tbody>
+                </table>
             </div>
         {/if}
     </section>
 </div>
 
 <style>
-    .ui-search.wide { width: 340px; }
-    .narrow { width: auto; height: 32px; }
-    .rx { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
-    .rx input { accent-color: var(--accent); }
-    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -8px; }
-    .chip { height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid var(--border); background: var(--surface); font-size: 12px; color: var(--text-primary); cursor: pointer; }
-    .chip:hover { border-color: var(--accent); color: var(--accent); }
-    .lines { font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.55; max-height: calc(100vh - 300px); min-height: 200px; overflow: auto; }
-    .ln { display: grid; grid-template-columns: 132px 120px minmax(0, 1fr); gap: 0 14px; padding: 3px 20px; border-bottom: 1px solid var(--border); }
-    .ln:last-child { border-bottom: none; }
-    .ln:hover { background: var(--highlight-3); }
-    .t { color: var(--text-secondary); white-space: nowrap; }
-    .s { color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .m { color: var(--text-primary); white-space: pre-wrap; overflow-wrap: anywhere; }
-    .ln.bad .m { color: var(--red); }
+    .src { width: auto; height: 32px; }
+    .scroll { max-height: calc(100vh - 260px); overflow-y: auto; }
+    .scroll thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+    .ui-tbl td { padding-top: 8px; padding-bottom: 8px; vertical-align: top; }
+    .ui-tbl tbody tr:first-child td { padding-top: 10px; }
+    .t { color: var(--text-secondary); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+    .lvl { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 8px; vertical-align: middle; background: transparent; }
+    .lvl.bad { background: var(--red); }
+    .s { font-weight: 500; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+    .m { white-space: pre-wrap; overflow-wrap: anywhere; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5; width: 100%; }
     .m :global(mark) { background: var(--accent-soft); color: var(--accent); border-radius: 2px; padding: 0 1px; }
     .dim { opacity: 0.55; }
-    @media (max-width: 768px) {
-        .ui-search.wide { width: 100%; }
-        .ln { grid-template-columns: 1fr; padding: 6px 14px; }
-        .t, .s { font-size: 11px; }
-    }
+    @media (max-width: 640px) { .src { width: 100%; } }
 </style>

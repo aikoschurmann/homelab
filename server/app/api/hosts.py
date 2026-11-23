@@ -548,10 +548,35 @@ def _built(hid, key, build):
     return inv["built"][key]
 
 
+_HW_FILE = paths.state('hardware')
+
+
+def _hw_saved():
+    try:
+        with open(_HW_FILE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
 def hardware_of(hid):
-    """Temperatures, drive health and UPS from a host's last inventory (agent 14+ for Linux sensors)."""
+    """Temperatures, drive health and UPS from a host's last inventory (agent 14+ for Linux sensors).
+    The last reading is kept on disk too, so a dashboard restart doesn't blank it until the
+    host's next inventory (once a minute)."""
     from app.services.hardware import from_inventory
-    return _built(hid, "hardware", lambda sections, at: {**from_inventory(sections), "at": int(at)})
+    def build(sections, at):
+        hw = {**from_inventory(sections), "at": int(at)}
+        try:
+            saved = _hw_saved()
+            saved[hid] = hw
+            tmp = _HW_FILE + '.tmp'
+            with open(tmp, 'w') as f:
+                json.dump(saved, f)
+            os.replace(tmp, _HW_FILE)
+        except OSError as e:
+            log.warning(f"saving hardware of {hid}: {e}")
+        return hw
+    return _built(hid, "hardware", build) or _hw_saved().get(hid)
 
 
 def _disks_of(hid):
