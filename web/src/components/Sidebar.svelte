@@ -12,6 +12,7 @@
     import { cfCounts, fetchCloudflare } from '../lib/cloudflare.js';
     import { databases, fetchDatabases } from '../lib/databases.js';
     import { backups, fetchBackups } from '../lib/backups.js';
+    import { updates, fetchUpdates } from '../lib/updates.js';
     import { endpointGroups, fetchEndpoints } from '../lib/endpoints.js';
     export let activeTab = "Overview";
     export let activeSection = null;
@@ -157,8 +158,8 @@
         mq.addEventListener('change', onMq);
         fetchMachines(); fetchHosts(); fetchHostOrder(); fetchPools();
         fetchServices();
-        fetchTailnet(); fetchCloudflare(); fetchDatabases().catch(() => {}); fetchBackups(); fetchEndpoints();
-        const t = setInterval(() => { if (visible()) { fetchMachines(); fetchServices(); fetchTailnet(); fetchHosts(); fetchPools(); fetchCloudflare(); } }, 30000);
+        fetchTailnet(); fetchCloudflare(); fetchDatabases().catch(() => {}); fetchBackups(); fetchEndpoints(); fetchUpdates().catch(() => {});
+        const t = setInterval(() => { if (visible()) { fetchMachines(); fetchServices(); fetchTailnet(); fetchHosts(); fetchPools(); fetchCloudflare(); fetchUpdates().catch(() => {}); } }, 30000);
         return () => { clearInterval(t); mq.removeEventListener('change', onMq); };
     });
 </script>
@@ -219,7 +220,7 @@
 {#snippet treeItem(item)}
     {@const open = expanded.has(item.tab)}
     {@const active = activeTab === item.tab}
-    {@const kids = item.sub ? childrenOf(item.tab, null, null, $tsCounts, null, active ? activeSection : null, $cfCounts, $databases, $backups, $endpointGroups) : []}
+    {@const kids = item.sub ? childrenOf(item.tab, null, null, $tsCounts, null, active ? activeSection : null, $cfCounts, $databases, $backups, $endpointGroups, $updates) : []}
     {@const childOn = active && kids.some(c => c.id === (activeSection ?? ''))}
     <div class="tn-row" class:active={active && !childOn} class:in={active && childOn} style="--d: 0">
         {#if kids.length}
@@ -298,7 +299,7 @@
                      except items marked sub (Cloudflare), whose filters are listed here too -->
                 {@const open = expanded.has(item.tab)}
                 {@const active = activeTab === item.tab}
-                {@const kids = item.sub ? childrenOf(item.tab, null, null, $tsCounts, null, active ? activeSection : null, $cfCounts, $databases, $backups, $endpointGroups) : []}
+                {@const kids = item.sub ? childrenOf(item.tab, null, null, $tsCounts, null, active ? activeSection : null, $cfCounts, $databases, $backups, $endpointGroups, $updates) : []}
                 {@const childOn = active && kids.some(c => c.id === (activeSection ?? ''))}
                 <div class="nav-item" class:has-kids={kids.length}>
                     <div class="row" class:active={active && !childOn} class:in={active}>

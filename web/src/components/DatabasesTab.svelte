@@ -1,7 +1,7 @@
 <script>
     import { SN } from '../lib/server.js';
     import { onMount } from 'svelte';
-    import { Database, Search, Key, Play, Loader2, ChevronLeft, ChevronRight, Table2, ArrowUp, ArrowDown, Filter, Download, RefreshCw, Copy, X } from 'lucide-svelte';
+    import { Database, Search, Key, Play, Loader2, ChevronLeft, ChevronRight, Table2, ArrowUp, ArrowDown, Filter, Download, RefreshCw, RotateCw, Copy, X } from 'lucide-svelte';
     import Tabs from './ui/Tabs.svelte';
     import Modal from './ui/Modal.svelte';
     import { copyText } from '../lib/clipboard.js';
@@ -334,7 +334,7 @@
     <div class="ui-page">
         <div class="ui-head">
             <div><h1>Databases</h1><p>SQLite databases on the Mac and inside its machines. Browsing is read-only; a machine's database is copied to the Mac first.</p></div>
-            <div class="ui-head-actions"><button class="ui-btn" on:click={rescan} disabled={rescanning}><span class:ui-spin={rescanning} class="rc"><RefreshCw size={13} /></span> Look again</button></div>
+            <div class="ui-head-actions"><button class="ui-btn" on:click={rescan} disabled={rescanning}><span class:ui-spin={rescanning} class="rc"><RotateCw size={14} /></span> Refresh</button></div>
         </div>
         <div class="summary">
             <div class="ui-stat"><span class="ui-stat-label">Databases</span><span class="ui-stat-value">{databases.length}</span><span class="ui-stat-sub">on the Mac and {groups.filter(g => g.machine).length} {groups.filter(g => g.machine).length === 1 ? 'machine' : 'machines'}</span></div>

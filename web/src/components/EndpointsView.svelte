@@ -8,6 +8,7 @@
     import StatusPill from './ui/StatusPill.svelte';
     import LiveChart from './ui/LiveChart.svelte';
     import { crumbLabels } from '../lib/stores.js';
+    import { groupSlug } from '../lib/endpoints.js';
     import { endpointGroups, fetchEndpoints } from '../lib/endpoints.js';
 
     // Routes: #endpoints, #endpoints/g-<group>, #endpoints/<id>[/history]
@@ -26,14 +27,15 @@
         return () => clearInterval(t);
     });
 
-    const slug = (g) => 'g-' + g.toLowerCase();
+    const slug = groupSlug;
     $: all = (groups || []).flatMap(g => g.endpoints.map(e => ({ ...e, group: g.name, key: `${e.method} ${e.path}` })));
     $: groupFilter = section?.startsWith('g-') ? section : null;
     $: endpoint = section && !groupFilter ? all.find(e => e.id === section) : null;
     // reactive, so rows redraw when `latency` arrives
     $: recs = (e) => latency[e.key] || [];
     const median = (xs) => { const v = [...xs].sort((a, b) => a - b); return v.length ? v[v.length >> 1] : null; };
-    const fmtMs = (ms) => ms == null ? '—' : ms < 1 ? ms.toFixed(2) + ' ms' : ms < 10 ? ms.toFixed(1) + ' ms' : Math.round(ms) + ' ms';
+    const fmtMs = (ms) => ms == null ? '—' : ms < 1 ? ms.toFixed(2) + ' ms' : ms < 10 ? ms.toFixed(1) + ' ms' : ms < 1000 ? Math.round(ms) + ' ms'
+        : ms < 60000 ? (ms / 1000).toFixed(ms < 10000 ? 1 : 0) + ' s' : `${Math.floor(ms / 60000)} min ${Math.round(ms % 60000 / 1000)} s`;
     const shortPath = (p) => p.replace(/^\/api/, '');
 
     // ---- list -----------------------------------------------------------------------------
@@ -69,7 +71,8 @@
     $: if (all.length) crumbLabels.update(c => ({ ...c, ...Object.fromEntries(all.map(e => [e.id, `${e.method} ${shortPath(e.path)}`])), ...Object.fromEntries((groups || []).map(g => [slug(g.name), g.name])) }));
     $: measured = all.filter(e => recs(e).length && e.group !== 'Internal');
     $: medAll = median(measured.map(e => recs(e)[0].latency));
-    $: slowest = [...measured].sort((a, b) => recs(b)[0].latency - recs(a)[0].latency)[0];
+    // reads only: a POST that runs a command or an update takes as long as the job does
+    $: slowest = [...measured].filter(e => e.method === 'GET').sort((a, b) => recs(b)[0].latency - recs(a)[0].latency)[0];
     $: errors = measured.filter(e => recs(e)[0].status >= 500).length;
 
     // ---- try it ---------------------------------------------------------------------------
@@ -264,7 +267,7 @@
         <div class="summary">
             <div class="ui-stat"><span class="ui-stat-label">Endpoints</span><span class="ui-stat-value">{all.length}</span><span class="ui-stat-sub">in {groups.length} groups</span></div>
             <div class="ui-stat"><span class="ui-stat-label">Median response</span><span class="ui-stat-value">{fmtMs(medAll)}</span><span class="ui-stat-sub">latest call of each endpoint</span></div>
-            <div class="ui-stat"><span class="ui-stat-label">Slowest</span><span class="ui-stat-value">{slowest ? fmtMs(recs(slowest)[0].latency) : '—'}</span><span class="ui-stat-sub">{slowest ? `${slowest.method} ${shortPath(slowest.path)}` : '—'}</span></div>
+            <div class="ui-stat"><span class="ui-stat-label">Slowest read</span><span class="ui-stat-value">{slowest ? fmtMs(recs(slowest)[0].latency) : '—'}</span><span class="ui-stat-sub">{slowest ? `${slowest.method} ${shortPath(slowest.path)}` : '—'}</span></div>
             <div class="ui-stat"><span class="ui-stat-label">Server errors</span><span class="ui-stat-value">{errors}</span><span class="ui-stat-sub">endpoints whose last call failed</span></div>
         </div>
 

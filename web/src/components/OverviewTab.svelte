@@ -10,11 +10,13 @@
     import InfraIndex from './hosts/InfraIndex.svelte';
     import WebAppsCard from './WebAppsCard.svelte';
     import { fetchDisks } from '../lib/storage.js';
+    import { updates } from '../lib/updates.js';
     import { hosts, fetchHosts } from '../lib/hosts.js';
     import { fetchTailnet } from '../lib/tailscale.js';
     import TailscaleCard from './overview/TailscaleCard.svelte';
     import ComputeCard from './overview/ComputeCard.svelte';
     import LiveChart from './ui/LiveChart.svelte';
+    import AttentionRow from './overview/AttentionRow.svelte';
 
     export let stats;
     export let tmux;
@@ -32,7 +34,9 @@
     $: disk = ratio(hd['Disk Space']);
     $: cpuNow = parseFloat(hd['CPU Usage']);
     $: upSince = (hd['Uptime'] || '').startsWith('T:') ? parseInt(hd['Uptime'].slice(2)) * 1000 : null;
-    $: updates = stats?.bg?.updates_host;
+    // same numbers as the Updates page: every computer, not just this server's Homebrew
+    $: updTargets = ($updates?.targets || []).filter(t => t.packages?.length);
+    $: pendingUpdates = updTargets.reduce((a, t) => a + t.packages.length, 0);
     $: pool = $machines?.pool;
     $: poolPct = pool && mem ? Math.min(100, (pool.memory_mib / 1024) / mem.total * 100) : 0;
     $: machineList = $machines?.machines || [];
@@ -258,7 +262,7 @@
                 <span><b>{onlineHosts}</b> of {plural(1 + ($hosts || []).length, 'host')} online</span>
                 <span><b>{machineList.filter(m => m.state === 'running').length}</b> {machineList.filter(m => m.state === 'running').length === 1 ? 'machine' : 'machines'} running</span>
                 <span><b>{runningContainers}</b> {runningContainers === 1 ? 'container' : 'containers'}</span>
-                {#if updates && updates !== '0' && updates !== '-'}<a class="up-link" href="#updates">{updates} updates available on {SN}</a>{/if}
+                {#if pendingUpdates && !show('attention')}<a class="up-link" href="#updates">{plural(pendingUpdates, 'update')} on {updTargets.length === 1 ? updTargets[0].name : plural(updTargets.length, 'computer')}</a>{/if}
             </div>
         </div>
         <div class="ui-head-actions">
@@ -284,6 +288,8 @@
 
     {#if show('webapps')}<WebAppsCard />{/if}
 
+    {#if show('attention')}<AttentionRow {now} {pendingUpdates} {updTargets} {backup} />{/if}
+
     {#if show('host')}
     <!-- the cluster: totals split per host, then one card per host (same as the Infrastructure page) -->
     <div id="sec-host">
@@ -292,8 +298,6 @@
             vm={{ running: !!vmEngine, cpu: vmCpu, memGb: vmGb, limitGb: pool ? pool.memory_mib / 1024 : null, up: vmEngine?.uptime_seconds }} />
     </div>
     {/if}
-
-    {#if show('compute')}<ComputeCard />{/if}
 
     <!-- Tailscale summary beside the other pages' shortcuts -->
     {#if show('tailscale') || show('shortcuts')}
@@ -309,11 +313,6 @@
                 <span class="sc-main"><span class="sc-k">Databases</span><span class="sc-v">{dbList.length} <small><i class="sep">· </i>{size(dbList.reduce((a, d) => a + (d.size_bytes || 0), 0))}</small></span></span>
                 <ArrowRight size={14} class="sc-go" />
             </a>
-            <a class="sc" href="#backups">
-                <span class="sc-ic"><Archive size={16} /></span>
-                <span class="sc-main"><span class="sc-k">Backups</span><span class="sc-v">{backup?.last_success ? agoTs(backup.last_success) : '—'} <small>{#if backup?.running || backup?.next_run}<i class="sep">· </i>{/if}{backup?.running ? 'running now' : backup?.next_run ? 'next ' + inTs(backup.next_run) : ''}</small></span></span>
-                <ArrowRight size={14} class="sc-go" />
-            </a>
             <a class="sc" href="#terminal" id="sec-terminal">
                 <span class="sc-ic"><Terminal size={16} /></span>
                 <span class="sc-main"><span class="sc-k">Terminal</span><span class="sc-v">{sessions.length} <small>{sessions.length === 1 ? 'tmux session' : 'tmux sessions'}</small></span></span>
@@ -323,6 +322,8 @@
         {/if}
     </div>
     {/if}
+
+    {#if show('compute')}<ComputeCard />{/if}
 
     {#if show('api-latency')}
     <section class="ui-card" id="sec-api-latency">
@@ -414,7 +415,7 @@
     .shortcuts { display: grid; grid-template-columns: 1fr; gap: 12px; align-content: stretch; }
     .ts-row .shortcuts { grid-auto-rows: 1fr; }
     .ts-row.single { grid-template-columns: 1fr; }
-    .ts-row.single .shortcuts { grid-template-columns: repeat(3, 1fr); }
+    .ts-row.single .shortcuts { grid-template-columns: repeat(2, 1fr); }
     .sc { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 8px); text-decoration: none; color: var(--text-primary); transition: border-color .12s, box-shadow .12s; min-width: 0; }
     .sc:hover { border-color: var(--border-strong); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05); }
     .sc-ic { width: 36px; height: 36px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -499,7 +500,7 @@
     }
     @media (max-width: 1100px) {
         .ts-row { grid-template-columns: 1fr; }
-        .shortcuts { grid-template-columns: repeat(3, 1fr); }
+        .shortcuts { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 760px) {
         .ui-card-head { flex-wrap: wrap; }

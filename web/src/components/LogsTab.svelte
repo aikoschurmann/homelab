@@ -82,13 +82,13 @@
         {:else}
             <div class="ui-tbl-wrap scroll" class:dim={loading}>
                 <table class="ui-tbl">
-                    <thead><tr><th class="shrink">Time</th><th class="shrink c-sm">Source</th><th>Message</th></tr></thead>
+                    <thead><tr><th class="shrink tcol">Time</th><th class="shrink c-sm">Source</th><th>Message</th></tr></thead>
                     <tbody>
                         {#each data.lines as r, i (i)}
                             <tr>
-                                <td class="t"><span class="lvl" class:bad={PROBLEM.test(r.line)}></span>{time(r.t)}</td>
+                                <td class="t tcol"><span class="lvl" class:bad={PROBLEM.test(r.line)}></span>{time(r.t)}</td>
                                 <td class="c-sm s" title={r.where === 'mac' ? 'App on the Mac' : `Container in ${r.where}`}>{r.source}</td>
-                                <td class="m">{@html mark(r.line)}</td>
+                                <td class="m"><div class="when"><span class="lvl" class:bad={PROBLEM.test(r.line)}></span>{time(r.t)} · {r.source}</div>{@html mark(r.line)}</td>
                             </tr>
                         {/each}
                     </tbody>
@@ -111,5 +111,14 @@
     .m { white-space: pre-wrap; overflow-wrap: anywhere; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5; width: 100%; }
     .m :global(mark) { background: var(--accent-soft); color: var(--accent); border-radius: 2px; padding: 0 1px; }
     .dim { opacity: 0.55; }
-    @media (max-width: 640px) { .src { width: 100%; } }
+    .t { white-space: nowrap; }
+    .when { display: none; }
+    /* phone: time and source go on a grey line above the message, which gets the full width */
+    @media (max-width: 640px) {
+        .src { width: 100%; }
+        .tcol { display: none; }
+        .when { display: block; font-family: 'Inter', sans-serif; font-size: 11.5px; color: var(--text-secondary); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .when .lvl:not(.bad) { display: none; }
+        .ui-tbl .m, .ui-tbl th:last-child { padding-left: 14px; }
+    }
 </style>

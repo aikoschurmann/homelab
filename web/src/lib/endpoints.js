@@ -10,4 +10,4 @@ export async function fetchEndpoints() {
         if (j.status === 'success') endpointGroups.set(j.data);
     } catch (e) {}
 }
-export const groupSlug = (g) => 'g-' + g.toLowerCase();
+export const groupSlug = (g) => 'g-' + g.toLowerCase().replace(/\s+/g, '-');

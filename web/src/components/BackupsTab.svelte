@@ -53,7 +53,9 @@
     // ---- formatting ----------------------------------------------------------------------
     function fmtSize(b) {
         if (!b) return '0 B';
-        const u = ['B', 'KB', 'MB', 'GB', 'TB'], i = Math.min(4, Math.floor(Math.log(b) / Math.log(1024)));
+        const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let i = Math.min(4, Math.floor(Math.log(b) / Math.log(1024)));
+        if (i < 4 && b / 1024 ** i >= 1000) i++;     // 1016.9 MB reads as 0.99 GB
         return (b / 1024 ** i).toFixed(i >= 3 ? 2 : i ? 1 : 0) + ' ' + u[i];
     }
     const fmtDate = snapLabel;
@@ -278,13 +280,13 @@
             <section class="ui-card">
                 <div class="ui-tbl-wrap">
                     <table class="ui-tbl list snaps">
-                        <colgroup><col class="w-when" /><col /><col class="w-size" /><col class="w-act" /></colgroup>
-                        <thead><tr><th>Snapshot</th><th>Contents</th><th class="r">Size</th><th></th></tr></thead>
+                        <colgroup><col class="w-when" /><col class="ct" /><col class="w-size" /><col class="w-act" /></colgroup>
+                        <thead><tr><th>Snapshot</th><th class="ct">Contents</th><th class="r">Size</th><th></th></tr></thead>
                         <tbody>
                             {#each snaps as s, i (s.timestamp)}
                                 <tr class="click" on:click={() => go(s.timestamp)}>
                                     <td><span class="strong">{fmtDate(s.created)}</span><small>{rel(s.created)}</small></td>
-                                    <td class="wrap">
+                                    <td class="wrap ct">
                                         <span class="parts">{#each s.files as f, j}{#if j}<span class="sep">·</span>{' '}{/if}<span class:bad={!f.size_bytes}>{f.label} <span class="dim">{f.size_bytes ? fmtSize(f.size_bytes) : 'failed'}</span></span>{/each}</span>
                                     </td>
                                     <td class="r num"><span class="strong">{fmtSize(s.size_bytes)}</span>{#if deltaOf(i) != null}<small>{signed(deltaOf(i))}</small>{/if}</td>
@@ -436,4 +438,6 @@
         .list th { white-space: normal; }
     }
     @media (max-width: 560px) { .summary { grid-template-columns: 1fr; } }
+    /* phone: what's inside is on the snapshot's own page; the list keeps date and size */
+    @media (max-width: 640px) { table.snaps .ct { display: none; } table.snaps .w-when { width: auto; } }
 </style>

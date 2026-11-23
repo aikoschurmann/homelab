@@ -184,10 +184,31 @@ def _apply(j, tid, packages):
     check(only=tid)
 
 
+def _host_jobs():
+    """Other computers' upgrade actions (queued through the agent), shaped like the jobs above."""
+    from app.api import hosts as H
+    out = []
+    with H._lock:
+        for hid, acts in H._actions.items():
+            for a in acts:
+                if a['verb'] not in ('upgrade', 'upgrade-pkg'):
+                    continue
+                busy = a['state'] in ('queued', 'sent')
+                if not busy and time.time() - (a.get('done') or a['at']) > 600:
+                    continue
+                lines = (a.get('output') or '').strip().splitlines()
+                out.append({"id": f"h{a['id']}", "target": f"host:{hid}", "packages": [a['target']] if a['target'] else [],
+                            "state": 'running' if busy else 'done' if a['state'] == 'done' else 'failed',
+                            "started": int(a['at']), "finished": int(a.get('done') or a['at']),
+                            "output": a.get('output') or '', "error": (lines[-1][:300] if lines else a['state']) if a['state'] != 'done' else None})
+    return sorted(out, key=lambda j: j['started'])
+
+
 @updates_bp.route('', methods=['GET'])
 def list_updates():
     with _lock:
         jobs = [dict(j) for j in _jobs.values() if j['state'] == 'running' or time.time() - j.get('finished', 0) < 600]
+    jobs += _host_jobs()
     return jsonify({"status": "success", "data": {"targets": overview(), "jobs": jobs, "checking": _checking.is_set()}})
 
 
@@ -203,6 +224,9 @@ def apply(tid):
     packages = [p for p in (body.get('packages') or []) if isinstance(p, str) and re.fullmatch(r'[A-Za-z0-9@._+:/-]+', p)]
     if tid.startswith('host:'):
         from app.api.hosts import queue_action
+        # one package (agent 18) or everything; the agent runs one at a time anyway
+        if len(packages) == 1:
+            return queue_action(tid[5:], {"verb": "upgrade-pkg", "target": packages[0]})
         return queue_action(tid[5:], {"verb": "upgrade"})
     if tid != 'mac' and not tid.startswith('vm:'):
         return jsonify({"status": "error", "message": "Unknown computer"}), 404

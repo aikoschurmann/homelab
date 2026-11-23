@@ -298,7 +298,7 @@
 
     {#if tab === 'general'}
     <section class="ui-card">
-        <div class="ui-card-head"><div><h2 class="ui-card-title">This server</h2><p class="ui-card-desc">{server.os} · {server.hostname} · kept in <span class="ui-mono">{server.home}/server.json</span>.</p></div></div>
+        <div class="ui-card-head"><div><h2 class="ui-card-title">This server</h2><p class="ui-card-desc">{server.os} · {server.hostname} · kept in <span class="ui-mono">{server.home.replace(/^\/Users\/[^/]+|^\/home\/[^/]+/, '~')}/server.json</span>.</p></div></div>
         <div class="rows">
             <div class="ui-form-row">
                 <div><div class="ui-label">Name</div><div class="ui-hint">What the dashboard calls this computer</div></div>

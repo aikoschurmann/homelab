@@ -56,12 +56,33 @@ def targets():
     except Exception:
         names = []
     out += [{"id": n, "name": n, "kind": "machine", "docker": _has_docker(n)} for n in names]
+    # other computers, through their agent (17+ reports its Compose apps and can install them)
+    try:
+        from app.api.hosts import _load, _public
+        for h in _load():
+            v = _public(h)
+            if not v.get('online'):
+                continue
+            agent = int((v.get('report') or {}).get('agent') or 0)
+            has = agent >= 17 and bool(_built_apps(h['id']) is not None)
+            out.append({"id": f"host:{h['id']}", "name": h['name'], "kind": "host", "docker": has, "addr": (v.get('report') or {}).get('ip'),
+                        "why": None if has else ("Update its agent first" if agent < 17 else "Docker isn't running there")})
+    except Exception as e:
+        log.warning(f"apps: host targets: {e}")
     return out
+
+
+def _built_apps(hid):
+    from app.api.hosts import _built
+    return _built(hid, 'apps_text', lambda sections, at: sections.get('apps'))
 
 
 def machines():
     """Targets that have Docker now."""
     return [t['id'] for t in targets() if t['docker']]
+
+
+_pending = {}        # install ticket -> compose text, handed to a host's agent once
 
 
 # ---- registry digests ------------------------------------------------------------------------
@@ -124,9 +145,16 @@ docker ps -aq | xargs -r docker inspect --format '{{.Name}}|{{.Image}}|{{index .
 
 
 def installed(machine, check=True):
-    r = _orb(machine, _PS_SH, timeout=40)
+    if machine.startswith('host:'):
+        from app.api.hosts import _built
+        text = _built(machine[5:], 'apps_text', lambda sections, at: sections.get('apps'))
+        return parse_ps(text or '', machine, check)
+    return parse_ps(_orb(machine, _PS_SH, timeout=40).stdout, machine, check)
+
+
+def parse_ps(text, machine, check=True):
     part, rows, img_digest, inspect = 'ps', [], {}, {}
-    for line in r.stdout.splitlines():
+    for line in text.splitlines():
         if line in ('#images', '#inspect'):
             part = line[1:]; continue
         if part == 'ps' and line.startswith('{'):
@@ -242,9 +270,37 @@ def list_installed():
     ms = machines()
     with ThreadPoolExecutor(max_workers=4) as pool:
         out = [p for ps in pool.map(lambda m: installed(m, check), ms) for p in ps]
+    _sync_host_jobs()
     with _lock:
         jobs = [dict(j) for j in _jobs.values() if j['state'] == 'running' or time.time() - j.get('finished', 0) < 900]
     return jsonify({"status": "success", "data": {"projects": out, "machines": ms, "jobs": jobs}})
+
+
+def _sync_host_jobs():
+    from app.api.hosts import _actions
+    for j in list(_jobs.values()):
+        if j['state'] != 'running' or not j.get('action'):
+            continue
+        a = next((a for a in _actions.get(j['machine'][5:], []) if a['id'] == j['action']), None)
+        if a and a['state'] in ('done', 'failed', 'expired'):
+            ok = a['state'] == 'done'
+            j.update(state='done' if ok else 'failed', finished=int(time.time()), log=a.get('output') or '')
+            if not ok:
+                tail = [l for l in (a.get('output') or '').splitlines() if l.strip()]
+                j['error'] = tail[-1][:300] if tail else ('Not picked up' if a['state'] == 'expired' else 'Failed')
+
+
+@apps_bp.route('/agent/<ticket>', methods=['GET'])
+def agent_compose(ticket):
+    """An app's compose file for the agent installing it (once, with that host's token)."""
+    from flask import Response
+    from app.api.hosts import _by_token
+    if not _by_token(request.headers.get('Authorization', '').removeprefix('Bearer ').strip()):
+        return jsonify({"status": "error", "message": "unknown token"}), 401
+    text = _pending.pop(ticket, None)
+    if text is None:
+        return jsonify({"status": "error", "message": "unknown or used ticket"}), 404
+    return Response(text, mimetype='text/plain')
 
 
 @apps_bp.route('/install', methods=['POST'])
@@ -255,13 +311,15 @@ def install():
         return jsonify({"status": "error", "message": "Unknown app"}), 404
     tg = next((t for t in targets() if t['id'] == machine), None)
     if not tg:
-        return jsonify({"status": "error", "message": "Pick this Mac or a running machine"}), 400
+        return jsonify({"status": "error", "message": "Pick this Mac, a running machine or an online computer"}), 400
+    if tg['kind'] == 'host' and not tg['docker']:
+        return jsonify({"status": "error", "message": f"{tg['name']}: {tg['why']}"}), 400
     try:
         port = int(b.get('port') or app['port'])
         assert 1 <= port <= 65535
     except (ValueError, AssertionError):
         return jsonify({"status": "error", "message": "Port must be 1 to 65535"}), 400
-    busy = _orb(machine, "lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | awk 'NR>1 {print $9}' | sed 's/.*://'" if machine == MAC else
+    busy = [] if machine.startswith('host:') else _orb(machine, "lsof -nP -iTCP -sTCP:LISTEN 2>/dev/null | awk 'NR>1 {print $9}' | sed 's/.*://'" if machine == MAC else
                 "ss -ltnH 2>/dev/null | awk '{print $4}' | sed 's/.*://' || netstat -ltn | awk 'NR>2 {print $4}' | sed 's/.*://'", timeout=15).stdout.split()
     if str(port) in busy:
         return jsonify({"status": "error", "message": f"Port {port} is already in use in {machine}"}), 409
@@ -270,6 +328,17 @@ def install():
     except Exception:
         tz = 'UTC'
     compose = app['compose'].format(port=port, secret=secrets.token_urlsafe(24), tz=tz)
+    if machine.startswith('host:'):
+        from app.api.hosts import queue_action
+        ticket = secrets.token_hex(8)
+        _pending[ticket] = f"# app: {app['id']}\n" + compose
+        r = queue_action(machine[5:], {"verb": "app-install", "target": ticket})
+        data = r.get_json() if hasattr(r, 'get_json') else r[0].get_json()
+        if data.get('status') != 'success':
+            _pending.pop(ticket, None)
+            return jsonify(data), 400
+        j = _job(kind='install', app=app['id'], name=app['name'], machine=machine, port=port, action=data['data']['id'])
+        return jsonify({"status": "success", "data": j})
     j = _job(kind='install', app=app['id'], name=app['name'], machine=machine, port=port, docker_first=not tg['docker'])
     def go():
         if not tg['docker']:
@@ -293,6 +362,14 @@ def act(machine, project, action):
     p = next((p for p in installed(machine, check=False) if p['project'] == project), None)
     if not p:
         return jsonify({"status": "error", "message": "No such app"}), 404
+    if machine.startswith('host:'):
+        from app.api.hosts import queue_action
+        r = queue_action(machine[5:], {"verb": f"app-{action}", "target": project})
+        data = r.get_json() if hasattr(r, 'get_json') else r[0].get_json()
+        if data.get('status') != 'success':
+            return jsonify(data), 400
+        j = _job(kind=action, project=project, machine=machine, action=data['data']['id'])
+        return jsonify({"status": "success", "data": j})
     with _lock:
         if any(j.get('project') == project and j['machine'] == machine and j['state'] == 'running' for j in _jobs.values()):
             return jsonify({"status": "error", "message": "Already busy"}), 409

@@ -1,4 +1,5 @@
 import { SN } from './server.js';
+import { groupSlug } from './endpoints.js';
 import { Activity, Eye, Boxes, Database, Box, Archive, Terminal, Settings, Network, Server, Gauge, Cloud, Globe, ScrollText, PackageCheck, Store } from 'lucide-svelte';
 
 // Sidebar tree. A child with `el` is a section of its page (the element id it scrolls
@@ -19,18 +20,18 @@ export const NAV = [
     // one flat group: each is a page of its own (filters and tabs live on the page)
     { label: 'Tools', items: [
         // parent: the sidebar folds these into one entry; pages: its tabs show under it (filters stay on the page)
+        { tab: 'Tools', label: 'Network tools', icon: Gauge, parent: 'Network', pages: true, children: [page('', 'Checks'), page('uptime', 'Uptime'), page('pihole', 'Pi-hole'), page('speed', 'Speed test'), page('computers', 'Computers'), page('api', 'API health')] },
         { tab: 'Tailscale', icon: Network, parent: 'Network', pages: true, children: [page('', 'Devices'), page('ping', 'Ping'), page('people', 'People'), page('server', 'This server')] },
         { tab: 'Cloudflare', icon: Cloud, parent: 'Network', pages: true, children: [page('', 'Tunnels'), page('dns', 'DNS records')] },
-        { tab: 'Tools', label: 'Network tools', icon: Gauge, parent: 'Network', pages: true, children: [page('', 'Checks'), page('uptime', 'Uptime'), page('pihole', 'Pi-hole'), page('speed', 'Speed test'), page('computers', 'Computers'), page('api', 'API health')] },
         // sub: its children show in the sidebar too (other items keep theirs on the page)
         { tab: 'Databases', icon: Database, sub: true, children: [page('', 'All databases')] },
         { tab: 'Backups', icon: Archive, sub: true, children: [page('', 'Snapshots'), page('coverage', "What's covered"), page('runs', 'Runs')] },
         { tab: 'Apps', icon: Store, sub: true, children: [page('', 'Catalogue'), page('installed', 'Installed')] },
-        { tab: 'Logs', icon: ScrollText },
-        { tab: 'Updates', icon: PackageCheck },
         { tab: 'Terminal', icon: Terminal, sub: true, children: [page('', 'Sessions'), page('saved', 'Saved commands')] },
         // its groups are listed on the page itself (they come from the backend's route list)
         { tab: 'Endpoints', label: 'API endpoints', icon: Eye, sub: true, children: [page('', 'All endpoints')] },
+        { tab: 'Updates', icon: PackageCheck, sub: true, children: [page('', 'All computers')] },
+        { tab: 'Logs', icon: ScrollText },
     ] },
     // pinned to the bottom of the sidebar
     { footer: true, items: [
@@ -110,8 +111,11 @@ export function backupChildren(details) {
     }));
 }
 
+// Updates: one entry per computer, with how many packages are waiting
+export const updateChildren = (data) => (data?.targets || []).map((t, i) => ({ id: t.id, label: t.name, el: null, count: t.packages?.length || null, sep: i === 0 }));
+
 // API endpoints: one entry per group (route #endpoints/g-<group>)
-export const endpointChildren = (groups) => (groups || []).map((g, i) => ({ id: 'g-' + g.name.toLowerCase(), label: g.name, el: null, count: g.endpoints.length, sep: i === 0 }));
+export const endpointChildren = (groups) => (groups || []).map((g, i) => ({ id: groupSlug(g.name), label: g.name, el: null, count: g.endpoints.length, sep: i === 0 }));
 
 // The open item page (a service, device, database, snapshot, session) as a nested
 // entry under the entry it belongs to, so the sidebar always shows where you are
@@ -125,9 +129,12 @@ function current(tab, section, kids, serviceList, cfCounts, epGroups) {
         const t = cfCounts?.tunnels?.[section];
         if (t) { parent = t.parent; label = t.label; }
     } else if (tab === 'Endpoints') {
+        // a group (g-…) reads as its name; an endpoint as its path
+        const grp = (epGroups || []).find(x => groupSlug(x.name) === section);
         const g = (epGroups || []).find(x => x.endpoints.some(e => e.id === section));
         const e = g?.endpoints.find(e => e.id === section);
-        if (e) { parent = 'g-' + g.name.toLowerCase(); label = e.path.replace(/^\/api/, ''); }
+        if (grp) label = grp.name;
+        else if (e) { parent = groupSlug(g.name); label = e.path.replace(/^\/api/, ''); }
     } else if (tab === 'Terminal') {
         label = section.split(':').slice(1).join(':');
     } else if (tab === 'Backups') {
@@ -141,7 +148,7 @@ function current(tab, section, kids, serviceList, cfCounts, epGroups) {
 }
 
 // Children of a tab, with live machines, services, tailnet counts and the open item
-export function childrenOf(tab, machineList, serviceList, tsCounts, hostList, section = null, cfCounts = null, dbList = null, backupList = null, epGroups = null) {
+export function childrenOf(tab, machineList, serviceList, tsCounts, hostList, section = null, cfCounts = null, dbList = null, backupList = null, epGroups = null, updList = null) {
     const item = NAV.flatMap(g => g.items).find(i => i.tab === tab);
     let kids = item?.children || [];
     if (tab === 'Hosts') kids = [...kids, ...hostChildren(hostList)];
@@ -150,11 +157,13 @@ export function childrenOf(tab, machineList, serviceList, tsCounts, hostList, se
     if (tab === 'Tailscale') kids = [...kids, ...tailscaleChildren(tsCounts)];
     if (tab === 'Cloudflare') kids = [...kids, ...cloudflareChildren(cfCounts)];
     if (tab === 'Databases') kids = [...kids, ...databaseChildren(dbList)];
-    if (tab === 'Backups') kids = [...kids, ...backupChildren(backupList)];
-    if (tab === 'Endpoints') kids = [...kids, ...endpointChildren(epGroups)];
+    // Backups' snapshots and the API groups are listed on their pages; the sidebar stays at the pages
+    if (tab === 'Updates') kids = [...kids, ...updateChildren(updList)];
     return current(tab, section, kids, serviceList, cfCounts, epGroups);
 }
 
+// a tab's first page ('' id), e.g. Terminal → Sessions, for the breadcrumb on the tab itself
+export const firstPage = (tab) => { const c = NAV.flatMap(g => g.items).find(x => x.tab === tab)?.children; return c?.length > 1 && c[0].id === '' ? c[0].label : null; };
 export const groupOf = (tab) => { const i = NAV.flatMap(g => g.items).find(x => x.tab === tab); return i?.parent || NAV.find(g => g.items.includes(i))?.label; };
 export const PARENTS = { Network: { label: 'Network', icon: Globe } };
 // a group's items with each parent's members folded into one { parent, items } entry, in place of the first

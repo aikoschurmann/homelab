@@ -1,7 +1,7 @@
 <script>
     import { Menu, Search, ChevronRight } from 'lucide-svelte';
     import UplinkStatus from './UplinkStatus.svelte';
-    import { groupOf, childrenOf, tabLabel } from '../lib/nav.js';
+    import { groupOf, childrenOf, tabLabel, PARENTS, firstPage } from '../lib/nav.js';
     import { machines, crumbLabels } from '../lib/stores.js';
     import { services } from '../lib/services.js';
     import { hosts } from '../lib/hosts.js';
@@ -21,7 +21,8 @@
     export let isMobileMenuOpen = false;
     export let onNavigate = () => {};
 
-    $: group = groupOf(activeTab);
+    // only a folded parent (Network) is a crumb; Tools is just a sidebar heading
+    $: group = PARENTS[groupOf(activeTab)] ? groupOf(activeTab) : null;
     // a section that isn't in the menu (e.g. "new") still gets a crumb
     $: found = activeSection && (childrenOf(activeTab, $machines?.machines, $services, $tsCounts, $hosts, activeSection, $cfCounts, $databases, $backups).find(c => c.id === activeSection)
         || { id: activeSection, label: activeSection === 'new' ? 'Create' : $crumbLabels[activeSection] || activeSection });
@@ -66,6 +67,10 @@
             {:else}
                 <span class="crumb cur">{section.label}</span>
             {/if}
+        {:else if firstPage(activeTab)}
+            <button class="crumb link" on:click={() => onNavigate(activeTab, null)}>{tabLabel(activeTab)}</button>
+            <ChevronRight size={13} class="sep" />
+            <span class="crumb cur">{firstPage(activeTab)}</span>
         {:else}
             <span class="crumb cur">{tabLabel(activeTab)}</span>
         {/if}

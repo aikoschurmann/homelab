@@ -80,20 +80,27 @@ def _mac_lines(app_id, since):
             continue
         try:
             with open(path, 'r', errors='replace') as f:
-                f.seek(max(0, os.path.getsize(path) - 4 * 1024 * 1024))
-                f.readline()
-                last = None
+                start = max(0, os.path.getsize(path) - 4 * 1024 * 1024)
+                f.seek(start)
+                if start:
+                    f.readline()        # landed mid-line
+                cur = None
                 for line in f:
                     line = ANSI.sub('', line.rstrip('\n'))
                     if not line:
                         continue
                     t = _ts(line)
-                    # a stack trace's lines have no time of their own: they belong to the line above
-                    t = t if t is not None else last
-                    last = t
-                    if t is not None and t < since:
+                    if t is None:
+                        # a stack trace's lines have no time of their own: they join the entry
+                        # above (lines before any timed one can't be placed, so they're dropped)
+                        if cur is not None and cur['line'].count('\n') < 80:
+                            cur['line'] += '\n' + line
                         continue
-                    rows.append({"t": t, "source": MAC_APPS[app_id], "where": "mac", "kind": "app", "line": line})
+                    cur = None
+                    if t < since:
+                        continue
+                    cur = {"t": t, "source": MAC_APPS[app_id], "where": "mac", "kind": "app", "line": line}
+                    rows.append(cur)
         except Exception as e:
             log.warning(f"logs from {path}: {e}")
     return rows

@@ -1,6 +1,6 @@
 <script>
     import { onMount } from 'svelte';
-    import { Image, KeyRound, House, Activity, FileText, Cloud, RefreshCw, GitBranch, Music, Headphones, ChefHat, Rss, FileStack, Wrench, Box, Search, ExternalLink, RotateCw, Trash2, Download, Apple, Server } from 'lucide-svelte';
+    import { Image, KeyRound, House, Activity, FileText, Cloud, RefreshCw, GitBranch, Music, Headphones, ChefHat, Rss, FileStack, Wrench, Box, Search, ExternalLink, RotateCw, Trash2, Download, Apple, Server, Laptop, Loader2 } from 'lucide-svelte';
     import { visible } from '../lib/stores.js';
     import Tabs from './ui/Tabs.svelte';
     import Modal from './ui/Modal.svelte';
@@ -42,7 +42,8 @@
     $: jobFor = (machine, project) => (inst?.jobs || []).filter(j => j.machine === machine && (j.project === project || j.app === project)).at(-1);
     $: updates = projects.filter(p => p.updates).length;
     const portOf = (p) => (p.containers.map(c => c.ports || '').join(',').match(/(?:0\.0\.0\.0|\[::\]):(\d+)->/) || [])[1];
-    const openUrl = (machine, port) => machine === 'mac' ? `http://${location.hostname}:${port}` : `http://${machine}.orb.local:${port}`;
+    const openUrl = (machine, port) => machine === 'mac' ? `http://${location.hostname}:${port}`
+        : machine.startsWith('host:') ? `http://${targets.find(t => t.id === machine)?.addr || machine.slice(5)}:${port}` : `http://${machine}.orb.local:${port}`;
 
     // ---- install ----
     let installing = null, form = {}, formErr = '';
@@ -92,7 +93,7 @@
             <section class="ui-card">
                 <div class="ui-tbl-wrap">
                     <table class="ui-tbl">
-                        <thead><tr><th>App</th><th class="c-sm">Category</th><th class="c-md">Port</th><th class="shrink"></th></tr></thead>
+                        <thead><tr><th>App</th><th class="c-sm">Category</th><th class="c-md">Port</th><th class="act"></th></tr></thead>
                         <tbody>
                             {#each shown as a (a.id)}
                                 {@const on = where(a.id)}
@@ -100,10 +101,11 @@
                                     <td class="wrap"><div class="row"><span class="ic"><svelte:component this={ICONS[a.icon] || Box} size={15} /></span><span class="tx"><b>{a.name}</b><small>{a.desc}</small></span></div></td>
                                     <td class="c-sm">{a.category}</td>
                                     <td class="c-md ui-mono">{a.port}</td>
-                                    <td>
-                                        {#if installingNow(a.id)}<StatusPill state="creating" label="Installing" />
-                                        {:else if on.length}<span class="ui-dim">On {on.join(', ')}</span>
-                                        {:else}<button class="ui-btn sm" disabled={!targets.length} on:click={() => openInstall(a)}>Install</button>{/if}
+                                    <!-- fixed-width column and button, so "Installing" never widens it -->
+                                    <td class="act">
+                                        {#if installingNow(a.id)}<button class="ui-btn sm inb" disabled><Loader2 size={13} class="ui-spin" /> Installing</button>
+                                        {:else if on.length}<span class="ui-dim on" title="On {on.join(', ')}">On {on.join(', ')}</span>
+                                        {:else}<button class="ui-btn sm inb" disabled={!targets.length} on:click={() => openInstall(a)}>Install</button>{/if}
                                     </td>
                                 </tr>
                             {:else}<tr><td colspan="4" class="ui-dim">No apps match.</td></tr>{/each}
@@ -174,10 +176,10 @@
                 <span class="ui-label">Where</span>
                 <div class="options">
                     {#each targets as t (t.id)}
-                        <button type="button" class="option" class:on={form.machine === t.id} on:click={() => form.machine = t.id}>
+                        <button type="button" class="option" class:on={form.machine === t.id} disabled={t.kind === 'host' && !t.docker} on:click={() => form.machine = t.id}>
                             <span class="radio"></span>
-                            <span class="o-icon">{#if t.kind === 'mac'}<Apple size={16} />{:else}<Server size={16} />{/if}</span>
-                            <span class="o-text"><b>{t.name}</b><small>{t.kind === 'mac' ? 'This Mac, in OrbStack’s Docker' : t.docker ? 'OrbStack machine · Docker ready' : 'OrbStack machine · installs Docker first'}</small></span>
+                            <span class="o-icon">{#if t.kind === 'mac'}<Apple size={16} />{:else if t.kind === 'host'}<Laptop size={16} />{:else}<Server size={16} />{/if}</span>
+                            <span class="o-text"><b>{t.name}</b><small>{t.kind === 'mac' ? 'This Mac, in OrbStack’s Docker' : t.kind === 'host' ? (t.docker ? 'Other computer · through its agent' : `Other computer · ${t.why}`) : t.docker ? 'OrbStack machine · Docker ready' : 'OrbStack machine · installs Docker first'}</small></span>
                         </button>
                     {/each}
                 </div>
@@ -186,7 +188,7 @@
                 <label for="ap-port">Web port</label>
                 <div class="portrow">
                     <input id="ap-port" class="ui-input mono port" type="number" min="1" max="65535" bind:value={form.port} />
-                    <span class="ui-hint ui-mono">{form.machine === 'mac' ? location.hostname : `${form.machine}.orb.local`}:{form.port}</span>
+                    <span class="ui-hint ui-mono">{openUrl(form.machine || '', form.port).replace('http://', '')}</span>
                 </div>
             </div>
             {#if chosen?.id === 'sietch'}<p class="ui-hint">Its data goes in Docker volumes, which sietch’s nightly backup includes.</p>{/if}
@@ -208,10 +210,15 @@
     .sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; white-space: normal; }
     .sub.err, .err { color: var(--red); }
     .spacer { width: 32px; }
+    .act { width: 150px; min-width: 150px; max-width: 150px; text-align: right; }
+    .inb { width: 104px; justify-content: center; }
+    /* same box as the Install button, so its text lines up with the button labels */
+    .on { display: inline-block; width: 104px; vertical-align: middle; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .f { display: flex; flex-direction: column; gap: 16px; padding-top: 4px; }
     .options { display: flex; flex-direction: column; gap: 8px; }
     .option { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-card, 8px); background: var(--surface); cursor: pointer; text-align: left; font: inherit; color: inherit; transition: border-color .12s, background .12s; }
-    .option:hover { border-color: var(--border-strong); }
+    .option:hover:not(:disabled) { border-color: var(--border-strong); }
+    .option:disabled { opacity: 0.5; cursor: default; }
     .option.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
     .radio { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border-strong); flex-shrink: 0; box-sizing: border-box; }
     .option.on .radio { border: 5px solid var(--accent-fill); }
@@ -223,4 +230,13 @@
     .portrow { display: flex; align-items: center; gap: 12px; }
     .port { width: 110px; }
     p.err, p.ui-hint { margin: 0; font-size: 13px; }
+    @media (max-width: 640px) {
+        /* the name and text get the width: no icon, two-line descriptions, one-line image list */
+        .ic { display: none; }
+        td.wrap { width: 100%; max-width: 0; }
+        .tx small { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: normal; }
+        .tx small.ui-mono { display: block; white-space: nowrap; text-overflow: ellipsis; }
+        .act { width: 92px; min-width: 92px; max-width: 92px; }
+        .inb, .on { width: 84px; }
+    }
 </style>

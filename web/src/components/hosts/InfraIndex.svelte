@@ -61,11 +61,11 @@
                 disk: r.disk_used ?? null, diskTotal: r.disk_total || 0,
                 lan: '', ts: r.ip || '',
                 chips: h.online ? [
-                    ...((h.caps?.orbstack || ms) ? [{ label: h.caps?.orbstack === 'stopped' && !ms ? 'VM stopped' : plural(mCount || 0, 'machine'), to: `${href.host(h.id)}/vm` }] : []),
+                    ...((h.caps?.orbstack === 'stopped' && !ms) || mCount ? [{ label: h.caps?.orbstack === 'stopped' && !ms ? 'VM stopped' : plural(mCount || 0, 'machine'), to: `${href.host(h.id)}/vm` }] : []),
                     ...(n ? [{ label: plural(n, 'container'), to: href.host(h.id) }] : []),
                     ...(apps ? [{ label: plural(apps, 'app'), to: `${href.host(h.id)}/apps` }] : []),
                 ] : [],
-                note: !h.online ? (h.last_seen ? `Offline · last report ${ago(h.last_seen)}` : 'Run the install command on it') : 'Nothing tracked yet',
+                note: !h.online ? (h.last_seen ? `Offline · last report ${ago(h.last_seen)}` : 'Run the install command on it') : '',
                 search: [h.name, r.os, r.ip, r.hostname].filter(Boolean).join(' ').toLowerCase(),
             };
         }),
@@ -118,7 +118,7 @@
             <div class="ui-segbar" title={cpuSegs.map(s => `${s.name}: ${s.cores.toFixed(2)} cores`).join('\n')}>
                 {#each cpuSegs as s}<i style="width: {pct(s.cores, totCores)}%; background: var(--metric-cpu); opacity: {s.shade}"></i>{/each}
             </div>
-            <span class="ui-stat-sub ui-legend">{#each cpuSegs as s}<span><b style="background: var(--metric-cpu); opacity: {s.shade}"></b>{s.name} {s.cores.toFixed(2)}</span>{:else}idle{/each}</span>
+            <span class="ui-stat-sub ui-legend">{#each cpuSegs as s}<span><b style="background: var(--metric-cpu); opacity: {s.shade}"></b>{s.name} {s.cores < 0.1 ? "<0.1" : s.cores.toFixed(1)} cores</span>{:else}idle{/each}</span>
         </div>
         <div class="ui-stat">
             <span class="ui-stat-label">Memory in use</span>

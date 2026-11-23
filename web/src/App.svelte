@@ -354,7 +354,7 @@
                 {/if}
 
                 {#if activeTab === 'Updates'}
-                    <UpdatesTab />
+                    <UpdatesTab section={activeSection} onNavigate={navigate} />
                 {/if}
 
                 {#if activeTab === 'Apps'}

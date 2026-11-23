@@ -3,10 +3,11 @@ import { writable } from 'svelte/store';
 // Overview cards the page's "Customize" menu can show or hide, one entry per card
 export const OVERVIEW_WIDGETS = [
     { id: 'webapps', label: 'Web apps' },
+    { id: 'attention', label: 'Updates, apps and backups' },
     { id: 'host', label: 'Cluster: totals and hosts' },
-    { id: 'compute', label: 'Compute pools' },
     { id: 'tailscale', label: 'Tailscale' },
-    { id: 'shortcuts', label: 'Databases, backups, terminal' },
+    { id: 'shortcuts', label: 'Databases, terminal' },
+    { id: 'compute', label: 'Compute pools' },
     { id: 'api-latency', label: 'API latency' },
 ];
 

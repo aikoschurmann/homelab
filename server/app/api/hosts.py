@@ -332,15 +332,18 @@ VERBS = {
     'service-start', 'service-stop', 'service-restart',
     'container-start', 'container-stop', 'container-restart',
     'vm-start', 'vm-stop', 'vm-restart', 'disk-eject', 'volume-mount',
-    'reboot', 'update-agent', 'backup-folders', 'backup-sizes', 'backup', 'upgrade',
+    'reboot', 'update-agent', 'backup-folders', 'backup-sizes', 'backup', 'upgrade', 'upgrade-pkg',
+    'app-install', 'app-update', 'app-restart', 'app-remove',
 }
 VERB_FROM = {**{v: 5 for v in ('vm-start', 'vm-stop', 'vm-restart', 'disk-eject', 'volume-mount')},
-             'backup-folders': 8, 'backup': 9, 'backup-sizes': 13}
+             'backup-folders': 8, 'backup': 9, 'backup-sizes': 13, 'upgrade': 16, 'upgrade-pkg': 18,
+             **{v: 17 for v in ('app-install', 'app-update', 'app-restart', 'app-remove')}}
 NO_TARGET = {'reboot', 'update-agent', 'backup-folders', 'backup-sizes', 'upgrade'}
-AGENT_VERSION = 16          # what install.sh hands out now; bump with every change to AGENT_SH
+AGENT_VERSION = 18          # what install.sh hands out now; bump with every change to AGENT_SH
 BACKUP_FROM = 9             # first agent version that sends folders for the nightly backup (8 had a bug)
 BACKUP_TTL = 3 * 3600       # a big folder can take a while to pack and send
 TARGET_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9@._:_-]{0,127}$')
+PKG_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9@._:+-]{0,127}$')   # one package for upgrade-pkg (gtk+3, libsigc++)
 ACTIONS_FROM = 4            # first agent version that runs actions
 QUEUE_TTL = 60              # an action the agent hasn't picked up by then is dropped
 RESULT_TTL = 600            # one it took but never answered is marked unknown
@@ -422,6 +425,9 @@ def queue_action(hid, body=None):
         return jsonify({"status": "error", "message": f"Unknown action {verb!r}"}), 400
     if verb in NO_TARGET:
         target = ''
+    elif verb == 'upgrade-pkg':
+        if not PKG_RE.match(target):
+            return jsonify({"status": "error", "message": "That isn't a valid package name"}), 400
     elif not TARGET_RE.match(target):
         return jsonify({"status": "error", "message": "That isn't a valid service or container name"}), 400
     if verb.startswith('service-') and target.removesuffix('.service') == 'arrakis-agent':
@@ -1295,6 +1301,15 @@ inventory() {
       fi; true; } > "$U.tmp" 2>/dev/null && mv "$U.tmp" "$U"
   fi
   cat "$U" 2>/dev/null
+  # Compose apps (agent 17): containers, image digests and each one's compose project
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    echo "#@apps"
+    docker ps -a --format '{{json .}}' 2>/dev/null
+    echo '#images'
+    docker images --digests --format '{{.Repository}}:{{.Tag}} {{.Digest}} {{.ID}}' 2>/dev/null
+    echo '#inspect'
+    docker ps -aq | xargs docker inspect --format '{{.Name}}|{{.Image}}|{{index .Config.Labels "com.docker.compose.project.working_dir"}}|{{index .Config.Labels "com.docker.compose.project.config_files"}}' 2>/dev/null
+  fi
   if command -v orb >/dev/null 2>&1; then
     if orb status 2>/dev/null | grep -qi running; then
       echo "#@orb list"; orb list -f json 2>/dev/null
@@ -1372,15 +1387,51 @@ run_action() {
       out=$(backup_sizes) ;;
     backup)
       out=$(backup_run "$t" 2>&1) || rc=$? ;;
-    upgrade)
+    app-install)
+      # the dashboard hands out the app's compose file once, by this action's ticket
+      f="$HOME/.arrakis-agent/app.$$"
+      if curl -fsS -m 30 -H "Authorization: Bearer $TOKEN" -o "$f" "$URL/api/apps/agent/$t" 2>/dev/null; then
+        a=$(sed -n '1s/^# app: //p' "$f")
+        case "$a" in
+          ''|*[!a-z0-9-]*) out="refused: bad app name"; rc=2; rm -f "$f" ;;
+          *) d="$HOME/.arrakis-agent/stacks/$a"
+             if [ -e "$d/compose.yml" ]; then out="$d already exists"; rc=2; rm -f "$f"
+             else mkdir -p "$d" && mv "$f" "$d/compose.yml" && : > "$d/.installed-by-dashboard"
+                  out=$(cd "$d" && docker compose up -d 2>&1) || rc=$?
+             fi ;;
+        esac
+      else out="couldn't fetch the app from the dashboard"; rc=2; rm -f "$f"
+      fi
+      out=$(printf '%s' "$out" | tail -c 3500)
+      inventory | post inventory >/dev/null 2>&1 ;;
+    app-update|app-restart|app-remove)
+      wd=$(docker ps -a --filter "label=com.docker.compose.project=$t" --format '{{.Label "com.docker.compose.project.working_dir"}}' | head -1)
+      files=$(docker ps -a --filter "label=com.docker.compose.project=$t" --format '{{.Label "com.docker.compose.project.config_files"}}' | head -1)
+      set --
+      old=$IFS; IFS=,; for x in $files; do [ -f "$x" ] && set -- "$@" -f "$x"; done; IFS=$old
+      case "$verb" in
+        app-update) out=$( (cd "${wd:-.}" 2>/dev/null; docker compose -p "$t" "$@" pull && docker compose -p "$t" "$@" up -d) 2>&1) || rc=$? ;;
+        app-restart) out=$( (cd "${wd:-.}" 2>/dev/null; docker compose -p "$t" "$@" restart) 2>&1) || rc=$? ;;
+        app-remove) out=$( (cd "${wd:-.}" 2>/dev/null; docker compose -p "$t" "$@" down) 2>&1) || rc=$?
+          d="$HOME/.arrakis-agent/stacks/$t"
+          [ "$rc" = 0 ] && [ -f "$d/.installed-by-dashboard" ] && rm -f "$d/compose.yml" "$d/.installed-by-dashboard" && rmdir "$d" 2>/dev/null ;;
+      esac
+      out=$(printf '%s' "$out" | tail -c 3500)
+      inventory | post inventory >/dev/null 2>&1 ;;
+    upgrade|upgrade-pkg)
+      # upgrade = everything; upgrade-pkg (agent 18) = just the package named by the target
+      set --; [ "$verb" = upgrade-pkg ] && set -- "$t"
       if [ "$OS_KIND" = Darwin ]; then
         b=$(command -v brew || ls /opt/homebrew/bin/brew /usr/local/bin/brew 2>/dev/null | head -1)
-        if [ -z "$b" ]; then out="Homebrew isn't installed"; rc=2; else out=$("$b" upgrade 2>&1) || rc=$?; fi
+        if [ -z "$b" ]; then out="Homebrew isn't installed"; rc=2; else out=$("$b" upgrade "$@" 2>&1) || rc=$?; fi
       elif [ "$IS_ROOT" != 1 ]; then out="the agent isn't running as root, so it can't install updates"; rc=2
-      elif command -v apk >/dev/null 2>&1; then out=$( (apk update && apk upgrade) 2>&1) || rc=$?
-      elif command -v apt-get >/dev/null 2>&1; then out=$( (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade) 2>&1) || rc=$?
-      elif command -v dnf >/dev/null 2>&1; then out=$(dnf -y upgrade 2>&1) || rc=$?
-      elif command -v pacman >/dev/null 2>&1; then out=$(pacman -Syu --noconfirm 2>&1) || rc=$?
+      elif command -v apk >/dev/null 2>&1; then out=$( (apk update && apk upgrade "$@") 2>&1) || rc=$?
+      elif command -v apt-get >/dev/null 2>&1; then
+        if [ $# -gt 0 ]; then out=$( (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y --only-upgrade "$@") 2>&1) || rc=$?
+        else out=$( (apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get -y upgrade) 2>&1) || rc=$?; fi
+      elif command -v dnf >/dev/null 2>&1; then out=$(dnf -y upgrade "$@" 2>&1) || rc=$?
+      elif command -v pacman >/dev/null 2>&1; then
+        if [ $# -gt 0 ]; then out=$(pacman -S --noconfirm "$@" 2>&1) || rc=$?; else out=$(pacman -Syu --noconfirm 2>&1) || rc=$?; fi
       else out="no known package manager"; rc=2
       fi
       out=$(printf '%s' "$out" | tail -c 3500)

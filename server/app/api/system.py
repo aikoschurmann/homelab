@@ -843,7 +843,7 @@ def get_endpoints_config():
         return (key, placeholder, type, value)
 
     groups = [
-        {"name": "Host", "endpoints": [
+        {"name": "This server", "endpoints": [
             ep("host-metrics", "GET", "/api/host/metrics", "Live CPU, memory, disk and network of the Mac"),
             ep("host-info", "GET", "/api/host/info", "Static machine and OS details"),
             ep("host-updates", "GET", "/api/host/updates", "Pending package updates on the Mac"),
@@ -940,7 +940,7 @@ def get_endpoints_config():
 
 # What each group is for (shown above its endpoints), and where routes nobody described go.
 GROUP_DOCS = {
-    "Host": "The Mac itself: live metrics, OS details, daemons and pre-approved commands.",
+    "This server": "The Mac itself: live metrics, OS details, daemons and pre-approved commands.",
     "Machines": "OrbStack machines: create, start/stop, limits, isolation, folders and system settings.",
     "Sharing": "Public SSH access to machines and each person's permissions.",
     "Hosts": "Other computers reporting in through the agent.",
@@ -1077,7 +1077,7 @@ def _with_discovered(groups):
             elif bp in _BP_GROUP:
                 group = _BP_GROUP[bp]
             elif path.startswith("/api/host/"):
-                group = "Host"
+                group = "This server"
             elif path.startswith(("/api/tools", "/api/network")):
                 group = "Tools"
             else:

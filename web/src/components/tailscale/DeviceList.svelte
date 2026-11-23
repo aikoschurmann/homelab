@@ -72,7 +72,7 @@
         <div class="ui-seg">
             {#each FILTERS as f}<button class:on={filter === f.id} on:click={() => setFilter(f.id)}>{f.label} <span class="n">{counts[f.id]}</span></button>{/each}
         </div>
-        <span class="ui-count">{shown.length} {shown.length === 1 ? 'device' : 'devices'}</span>
+        <span class="ui-count">{shown.length < matched.length ? `${shown.length} of ${matched.length} devices · offline hidden` : `${shown.length} ${shown.length === 1 ? 'device' : 'devices'}`}</span>
         <div class="ui-seg view" role="group" aria-label="View">
             <button class:on={view === 'grid'} on:click={() => setView('grid')} title="Cards" aria-label="Cards"><LayoutGrid size={14} /></button>
             <button class:on={view === 'table'} on:click={() => setView('table')} title="Table" aria-label="Table"><List size={14} /></button>
