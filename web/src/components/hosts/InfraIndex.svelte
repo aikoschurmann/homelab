@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     // #infra: every host, laid out like the OrbStack VM page — summary tiles split by
     // host, a toolbar, then one ResourceCard per host (or the folder tree as a table).
     import { Plus, Search, LayoutGrid, List, Laptop, Server } from 'lucide-svelte';
@@ -33,7 +34,7 @@
     $: ext = storageTotals($disks).external;
     $: list = byOrder([
         {
-            id: 'arrakis', name: 'Arrakis', tag: 'This server', online: true, icon: hostIcon($arrakisModel, 'macOS'), state: 'running', stateLabel: 'Online',
+            id: 'arrakis', name: SN, tag: 'This server', online: true, icon: hostIcon($arrakisModel, 'macOS'), state: 'running', stateLabel: 'Online',
             sub: `${shortOs(arrakis.os || 'macOS')} · ${arrakis.cores || '—'} cores · ${arrakis.mem ? arrakis.mem.total.toFixed(0) + ' GB' : '—'}`,
             cores: arrakis.cores || 0, cpu: isFinite(arrakis.cpu) ? arrakis.cpu : null,
             mem: arrakis.mem ? arrakis.mem.used * 2 ** 30 : null, memTotal: arrakis.mem ? arrakis.mem.total * 2 ** 30 : 0,

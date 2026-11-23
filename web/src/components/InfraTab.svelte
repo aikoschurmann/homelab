@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../lib/server.js';
     import { onMount } from 'svelte';
     import { Server, Laptop, Trash2, Loader2, Check, Terminal } from 'lucide-svelte';
     import { stats, machines, fetchMachines, fetchMachineUsage, hostVms, visible } from '../lib/stores.js';
@@ -109,7 +110,7 @@
                     <h2>Run this on the computer</h2>
                     {#if added}
                         <div class="cmd"><Terminal size={14} /><CopyText text={added.command} /></div>
-                        <p class="ui-hint">Works on macOS and Linux. It needs Tailscale (to reach Arrakis) and curl. Run it as root on Linux to install a systemd service; otherwise it starts with launchd (macOS) or cron.</p>
+                        <p class="ui-hint">Works on macOS and Linux. It needs Tailscale (to reach {SN}) and curl. Run it as root on Linux to install a systemd service; otherwise it starts with launchd (macOS) or cron.</p>
                     {:else}
                         <p class="ui-hint">A one-line install command appears here.</p>
                     {/if}
@@ -155,7 +156,7 @@
     {:else if !machineData}
         <div class="ui-page"><div class="ui-dim">Loading machines…</div></div>
     {:else if page === 'create'}
-        <MachineCreate data={machineData} onHost={vmOn} hostName={vmOnName || 'Arrakis'} back={() => vmBack(vmOn)} created={(n) => go('vm-' + vmRef(vmOn, n))} />
+        <MachineCreate data={machineData} onHost={vmOn} hostName={vmOnName || SN} back={() => vmBack(vmOn)} created={(n) => go('vm-' + vmRef(vmOn, n))} />
     {:else if page === 'machine'}
         {#key machineName}
             <MachineDetail data={machineData} name={machineName} hostName={vmOnName || 'the Mac'} tab={sub || 'overview'} setTab={(t) => go(section, t === 'overview' ? null : t)} back={() => vmBack(vmOn)} />
@@ -168,7 +169,7 @@
     {:else if page === 'service'}
         {#if svc}
             {#key svc.key}
-                <ServiceDetail {svc} {now} host={svc.host === 'Mac' ? 'Arrakis' : svc.host} tab={sub || 'overview'} setTab={(t) => go('svc-' + svc.id, t === 'overview' ? null : t)} />
+                <ServiceDetail {svc} {now} host={svc.host === 'Mac' ? SN : svc.host} tab={sub || 'overview'} setTab={(t) => go('svc-' + svc.id, t === 'overview' ? null : t)} />
             {/key}
         {:else}
             <div class="ui-page"><div class="ui-head"><div><h1>{section.slice(4)}</h1><p>No service by this name.</p></div></div></div>

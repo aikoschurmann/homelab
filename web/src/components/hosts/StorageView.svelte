@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     // A host's Storage tab: summary tiles, then one card per drive. Arrakis's and every
     // other host's, from /api/storage/disks or /api/hosts/<id>/storage (same shape).
     import { storageTotals } from '../../lib/storage.js';
@@ -6,7 +7,7 @@
     import DriveCard from '../ui/DriveCard.svelte';
 
     export let disks;                   // the drive list
-    export let host = 'Arrakis';
+    export let host = SN;
     export let onEject = null;
     export let onMount = null;
     export let hint = '';

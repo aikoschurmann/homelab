@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     // The cluster: totals across every online host, then a tree you open like folders.
     // Host → (Arrakis: OrbStack VM → machines → containers and services; macOS apps)
     //      → (other hosts: the same, from their agent; plus any containers). Bars only on host rows.
@@ -142,9 +143,9 @@
         <!-- Arrakis -->
         <div class="tr host" role="row" aria-expanded={isOpen('h:arrakis')} on:click={() => toggle('h:arrakis')}>
             <span class="nm">
-                <button class="car" class:open={isOpen('h:arrakis')} aria-label="Show what runs on Arrakis"><ChevronRight size={15} /></button>
+                <button class="car" class:open={isOpen('h:arrakis')} aria-label="Show what runs on {SN}"><ChevronRight size={15} /></button>
                 <span class="ic on"><svelte:component this={hostIcon($arrakisModel, 'macOS')} size={16} /></span>
-                <span class="nm-t"><a href="#infra/arrakis" on:click|stopPropagation><b>Arrakis</b></a><small>This server</small></span>
+                <span class="nm-t"><a href="#infra/arrakis" on:click|stopPropagation><b>{SN}</b></a><small>This server</small></span>
             </span>
             <span class="det">{specs(arrakis.os || 'macOS', arrakis.cores, arrakis.mem ? arrakis.mem.total * 2 ** 30 : 0)}</span>
             <span class="m"><span class="bar"><i style="width: {pct(arrakis.cpu, 100)}%; background: var(--metric-cpu)"></i></span><span class="v">{cpuTxt(arrakis.cpu)}</span></span>

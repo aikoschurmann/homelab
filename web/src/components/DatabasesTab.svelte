@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../lib/server.js';
     import { onMount } from 'svelte';
     import { Database, Search, Key, Play, Loader2, ChevronLeft, ChevronRight, Table2, ArrowUp, ArrowDown, Filter, Download, RefreshCw, Copy, X } from 'lucide-svelte';
     import Tabs from './ui/Tabs.svelte';
@@ -44,7 +45,7 @@
         for (const d of databases || []) {
             const key = `${d.host || ''}|${d.machine || ''}`;
             let g = out.find(x => x.key === key);
-            if (!g) out.push(g = { key, title: d.machine || 'Arrakis', sub: d.machine ? `Machine on ${d.host_name}` : 'The Mac', machine: !!d.machine, dbs: [] });
+            if (!g) out.push(g = { key, title: d.machine || SN, sub: d.machine ? `Machine on ${d.host_name}` : 'The Mac', machine: !!d.machine, dbs: [] });
             g.dbs.push(d);
         }
         return out;

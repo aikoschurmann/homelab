@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     // Arrakis on the tailnet: its addresses, key, exit node and the Tailscale client itself.
     import { ago, fmtDate } from '../../lib/tailscale.js';
     import CopyText from '../ui/CopyText.svelte';
@@ -12,7 +13,7 @@
 
 <div class="ts-sub">
     <section class="ui-card">
-        <div class="ui-card-head"><div><h2 class="ui-card-title">Addresses</h2><p class="ui-card-desc">How other devices reach Arrakis.</p></div></div>
+        <div class="ui-card-head"><div><h2 class="ui-card-title">Addresses</h2><p class="ui-card-desc">How other devices reach {SN}.</p></div></div>
         <dl class="ui-kv">
             <dt>Tailscale IP</dt><dd><CopyText text={s.ip} /></dd>
             {#if s.ipv6}<dt>IPv6</dt><dd><CopyText text={s.ipv6} /></dd>{/if}

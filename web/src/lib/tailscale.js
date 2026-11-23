@@ -1,3 +1,4 @@
+import { SN } from './server.js';
 import { writable, derived } from 'svelte/store';
 import { Monitor, Smartphone, Users, Box } from 'lucide-svelte';
 import AppleIcon from '../components/ui/AppleIcon.svelte';
@@ -49,7 +50,7 @@ export const PHONE_OS = ['iOS', 'Android', 'tvOS'];
 // What a device is in the cluster: a host (its agent reports this Tailscale IP),
 // an OrbStack machine on Arrakis, or neither. Gives the icon the sidebar tree uses for it.
 export function clusterOf(d, hostList, machineList, arrakisModel = '') {
-    if (d.self) return { kind: 'host', name: 'Arrakis', href: '#infra/arrakis', icon: hostIcon(arrakisModel, 'macOS') };
+    if (d.self) return { kind: 'host', name: SN, href: '#infra/arrakis', icon: hostIcon(arrakisModel, 'macOS') };
     const h = (hostList || []).find(x => x.report?.ip === d.ip);
     if (h) return { kind: 'host', name: h.name, href: `#infra/${h.id}`, icon: hostIcon(h.report?.model, h.report?.os) };
     const m = (machineList || []).find(x => x.tailscale?.ip === d.ip);

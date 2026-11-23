@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../lib/server.js';
     import { infoPop } from '../lib/infoPop.js';
     import { onMount } from 'svelte';
     import { Database, Terminal, ArrowRight, Archive, SlidersHorizontal, Check, Info } from 'lucide-svelte';
@@ -147,7 +148,7 @@
     $: onlineHosts = 1 + ($hosts || []).filter(h => h.online).length;
     $: runningContainers = machineList.reduce((a, m) => a + ($machineUsage[m.name]?.runs?.containers_running || 0), 0)
         + ($hosts || []).reduce((a, h) => a + (h.online ? (h.report?.containers || []).filter(c => c.status === 'running').length : 0), 0);
-    const hostName = (h) => h === 'Mac' ? 'Arrakis' : h;
+    const hostName = (h) => h === 'Mac' ? SN : h;
     // OrbStack's VM process holds the machines' memory: it is shown as the machines,
     // so it would be counted twice as a service
     const isVmEngine = (s) => /orbstack/i.test(s.name || '');
@@ -257,7 +258,7 @@
                 <span><b>{onlineHosts}</b> of {plural(1 + ($hosts || []).length, 'host')} online</span>
                 <span><b>{machineList.filter(m => m.state === 'running').length}</b> {machineList.filter(m => m.state === 'running').length === 1 ? 'machine' : 'machines'} running</span>
                 <span><b>{runningContainers}</b> {runningContainers === 1 ? 'container' : 'containers'}</span>
-                {#if updates && updates !== '0' && updates !== '-'}<span>{updates} updates available on Arrakis</span>{/if}
+                {#if updates && updates !== '0' && updates !== '-'}<span>{updates} updates available on {SN}</span>{/if}
             </div>
         </div>
         <div class="ui-head-actions">

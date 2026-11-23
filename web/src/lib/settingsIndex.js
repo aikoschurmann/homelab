@@ -1,3 +1,4 @@
+import { SN } from './server.js';
 // Every setting in the dashboard, wherever it lives, for the ⌘K box. Each entry opens its
 // page and highlights the row: `label` is the row's (or card's) label as the page shows it,
 // `kw` adds words people might type instead.
@@ -31,12 +32,12 @@ const GLOBAL = [
     G('History kept', 'Settings → Data', '#settings/data', 'History kept', 'retention metrics days database'),
     G('Tailscale auth key', 'Settings → Integrations', '#settings/integrations', 'Tailscale auth key', 'tailnet'),
     G('Cloudflare API token', 'Settings → Integrations', '#settings/integrations', 'Cloudflare API token', 'sharing ssh'),
-    G('OrbStack pool size', 'Arrakis → Settings', '#infra/arrakis/settings', 'OrbStack pool', 'cpu memory machines'),
-    G('Machine ports on the LAN', 'Arrakis → Settings', '#infra/arrakis/settings', 'Machine ports on the LAN', 'orbstack expose network'),
-    G('Docker ports on the LAN', 'Arrakis → Settings', '#infra/arrakis/settings', 'Docker ports on the LAN', 'orbstack expose pihole dns containers'),
-    G('HTTPS for .orb.local', 'Arrakis → Settings', '#infra/arrakis/settings', 'HTTPS for .orb.local', 'orbstack certificate'),
-    G('Pause while the Mac sleeps', 'Arrakis → Settings', '#infra/arrakis/settings', 'Pause while the Mac sleeps', 'orbstack power sleep'),
-    G('Rosetta', 'Arrakis → Settings', '#infra/arrakis/settings', 'Rosetta for Intel binaries', 'orbstack x86 amd64 emulation'),
+    G('OrbStack pool size', `${SN} → Settings`, '#infra/arrakis/settings', 'OrbStack pool', 'cpu memory machines'),
+    G('Machine ports on the LAN', `${SN} → Settings`, '#infra/arrakis/settings', 'Machine ports on the LAN', 'orbstack expose network'),
+    G('Docker ports on the LAN', `${SN} → Settings`, '#infra/arrakis/settings', 'Docker ports on the LAN', 'orbstack expose pihole dns containers'),
+    G('HTTPS for .orb.local', `${SN} → Settings`, '#infra/arrakis/settings', 'HTTPS for .orb.local', 'orbstack certificate'),
+    G('Pause while the Mac sleeps', `${SN} → Settings`, '#infra/arrakis/settings', 'Pause while the Mac sleeps', 'orbstack power sleep'),
+    G('Rosetta', `${SN} → Settings`, '#infra/arrakis/settings', 'Rosetta for Intel binaries', 'orbstack x86 amd64 emulation'),
     G('Hosts & machines overview', 'Settings → Hosts & machines', '#settings/hosts', 'Hosts & machines', 'all settings computers people'),
 ];
 

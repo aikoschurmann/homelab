@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     import { openShell } from '../../lib/terminal.js';
     import OrbStackSettings from '../machines/OrbStackSettings.svelte';
     // Another host's page, shaped like Arrakis's and a machine's: icon header, then tabs.
@@ -305,7 +306,7 @@
         </section>
 
         <section class="ui-card">
-            <div class="ui-card-head"><div><h2 class="ui-card-title">Health</h2><p class="ui-card-desc">Its reports, and its open ports checked from Arrakis every {checks?.every || 30} s. Last 24 hours.</p></div></div>
+            <div class="ui-card-head"><div><h2 class="ui-card-title">Health</h2><p class="ui-card-desc">Its reports, and its open ports checked from {SN} every {checks?.every || 30} s. Last 24 hours.</p></div></div>
             <div class="hl">
                 <div class="hl-r">
                     <span class="dot" class:bad={!h.online}></span>
@@ -542,7 +543,7 @@
             </OrbStackSettings>
         {:else if h.caps?.orbstack || h.orb_manage}
             <section class="ui-card">
-                <div class="ui-card-head"><div><h2 class="ui-card-title">OrbStack</h2><p class="ui-card-desc">Let the dashboard manage {h.name}'s OrbStack like Arrakis's: create, limit and share machines, and change its pool and switches.</p></div></div>
+                <div class="ui-card-head"><div><h2 class="ui-card-title">OrbStack</h2><p class="ui-card-desc">Let the dashboard manage {h.name}'s OrbStack like {SN}'s: create, limit and share machines, and change its pool and switches.</p></div></div>
                 <div class="rows"><div class="ui-form-row">
                     <div><div class="ui-label">Managed by the dashboard</div>
                         <div class="ui-hint">{#if h.orb_manage}{h.rpc ? `On · connected to ${h.name}` : +(r.agent || 0) < RPC_FROM ? `On · waiting for agent ${RPC_FROM} (⋯ → Update agent)` : `On · ${h.name} isn't connected right now`}{:else}Off · only shows what the agent reports{/if}</div></div>

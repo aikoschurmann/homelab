@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     import { onMount } from 'svelte';
     import { Plus, Search, Play, Square, RotateCw, Trash2, Settings2, Loader2, X, ExternalLink, Network, Layers, Server, LayoutGrid, List } from 'lucide-svelte';
     import { gbFromMib, fetchMachines, fetchHostVms, visible } from '../../lib/stores.js';
@@ -98,7 +99,7 @@
     <div class="ui-head">
         <div>
             <h1>OrbStack VM</h1>
-            <p>One Linux VM on Arrakis that runs these machines. They share its pool of CPU and memory.</p>
+            <p>One Linux VM on {SN} that runs these machines. They share its pool of CPU and memory.</p>
         </div>
         <div class="ui-head-actions">
             <button class="ui-btn primary" on:click={create}><Plus size={15} /> Create machine</button>

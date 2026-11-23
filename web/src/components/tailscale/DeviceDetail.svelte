@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     import { ExternalLink, Activity, Loader2 } from 'lucide-svelte';
     import { machines } from '../../lib/stores.js';
     import { hosts, arrakisModel } from '../../lib/hosts.js';
@@ -45,7 +46,7 @@
                 <div class="ui-meta">
                     <span><b class="ui-mono">{d.ip}</b></span>
                     <span>{isShared(d) ? `Shared with ${d.user}` : d.os || 'unknown OS'}</span>
-                    {#if c}<span><a class="ui-link" href={c.href}>{c.kind === 'host' ? 'Host page' : `${c.name} machine on Arrakis`}</a></span>{/if}
+                    {#if c}<span><a class="ui-link" href={c.href}>{c.kind === 'host' ? 'Host page' : `${c.name} machine on ${SN}`}</a></span>{/if}
                     <span>Added {fmtDate(d.created)}</span>
                 </div>
             </div>
@@ -74,12 +75,12 @@
         <dl class="facts">
             {#if !d.self}
             <div><dt>Connection</dt><dd>{d.connection === 'direct' ? 'Direct, peer to peer' : d.connection === 'relay' ? `Relayed through ${d.relay || 'DERP'}` : d.online ? 'Idle, no open session' : 'Not connected'}</dd></div>
-            <div><dt title="Counted since Tailscale last started on Arrakis">Traffic with Arrakis</dt><dd>{#if d.rx_bytes + d.tx_bytes}{fmtBytes(d.rx_bytes + d.tx_bytes)} <span class="ui-dim">{fmtBytes(d.rx_bytes)} from it · {fmtBytes(d.tx_bytes)} to it</span>{:else}—{/if}</dd></div>
+            <div><dt title="Counted since Tailscale last started on {SN}">Traffic with {SN}</dt><dd>{#if d.rx_bytes + d.tx_bytes}{fmtBytes(d.rx_bytes + d.tx_bytes)} <span class="ui-dim">{fmtBytes(d.rx_bytes)} from it · {fmtBytes(d.tx_bytes)} to it</span>{:else}—{/if}</dd></div>
             <div><dt>{d.online ? 'Last handshake' : 'Last seen'}</dt><dd>{d.online ? (d.last_handshake ? ago(d.last_handshake, now) : '—') : (d.last_seen ? ago(d.last_seen, now) : '—')}</dd></div>
             {/if}
             <div><dt>Owner</dt><dd>{ownerOf(d, me)}</dd></div>
             <div><dt>Key expires</dt><dd title={d.key_expiry ? fmtDate(d.key_expiry) : 'Tagged device or key expiry off'}>{d.key_expiry ? (expiresInDays > 0 ? `in ${expiresInDays} days` : 'expired') : 'Never'}{#if d.key_expiry}<span class="ui-dim">{fmtDate(d.key_expiry)}</span>{/if}</dd></div>
-            <div><dt>Exit node</dt><dd>{d.exit_node ? 'In use by Arrakis' : d.exit_node_option ? 'Offered' : 'No'}</dd></div>
+            <div><dt>Exit node</dt><dd>{d.exit_node ? `In use by ${SN}` : d.exit_node_option ? 'Offered' : 'No'}</dd></div>
         </dl>
     </section>
 

@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     // Ping every online device from Arrakis with `tailscale ping`: latency and whether the path is direct or relayed.
     import { Activity, Loader2 } from 'lucide-svelte';
     import { machines } from '../../lib/stores.js';
@@ -40,7 +41,7 @@
 <div class="ts-sub">
     <section class="ui-card">
         <div class="ui-card-head">
-            <div><h2 class="ui-card-title">Online devices</h2><p class="ui-card-desc">{#if done.length}{done.length} of {peers.length} answered · fastest {ms(best)} ms · average {ms(avg)} ms · {relayed} relayed{:else}Pinged from Arrakis with <span class="ui-mono">tailscale ping</span>, which also tells whether the path is direct or relayed.{/if}{#if offline}{' · '}{offline} offline, not pinged{/if}</p></div>
+            <div><h2 class="ui-card-title">Online devices</h2><p class="ui-card-desc">{#if done.length}{done.length} of {peers.length} answered · fastest {ms(best)} ms · average {ms(avg)} ms · {relayed} relayed{:else}Pinged from {SN} with <span class="ui-mono">tailscale ping</span>, which also tells whether the path is direct or relayed.{/if}{#if offline}{' · '}{offline} offline, not pinged{/if}</p></div>
             <button class="ui-btn" disabled={all || !peers.length} on:click={pingAll}>{#if all}<Loader2 size={14} class="ui-spin" />{:else}<Activity size={14} />{/if} Ping all</button>
         </div>
         <div class="ui-tbl-wrap">

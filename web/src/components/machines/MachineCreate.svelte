@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     import { onMount } from 'svelte';
     import { Loader2, Check, Cpu, Zap, Layers, SlidersHorizontal } from 'lucide-svelte';
     import { gbFromMib, fetchMachines, fetchHostVms } from '../../lib/stores.js';
@@ -10,7 +11,7 @@
     export let back = () => {};
     export let created = () => {};   // created(name)
     export let onHost = null;        // another host's id: create there; null = on Arrakis
-    export let hostName = 'Arrakis';
+    export let hostName = SN;
 
     $: host = data.host;
     $: pool = data.pool;

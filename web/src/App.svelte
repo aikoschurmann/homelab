@@ -1,4 +1,5 @@
 <script>
+    import { SN } from './lib/server.js';
     import { savedTheme, applyTheme, applyAppearance, savedAppearance } from './lib/theme.js';
     import { onMount, tick } from 'svelte';
     import Sidebar from './components/Sidebar.svelte';
@@ -106,7 +107,7 @@
     }
 
     // Browser tab shows where you are
-    $: document.title = `${activeTab === 'Infra' ? (pathOf(activeSection, $machines?.machines, $hosts, $services, $pools).at(-1)?.label || 'Infrastructure') : activeTab} · Arrakis`;
+    $: document.title = `${activeTab === 'Infra' ? (pathOf(activeSection, $machines?.machines, $hosts, $services, $pools).at(-1)?.label || 'Infrastructure') : activeTab} · ${SN}`;
 
     let isFetching = false;
     let lastFetchAt = null;
@@ -311,7 +312,7 @@
         <div class="scroll-area" bind:this={scrollEl} on:scroll={onScroll}>
             <div class="page-wrap">
             {#if !stats}
-                <div class="boot"><Loader2 size={16} class="ui-spin" /> Connecting to Arrakis…</div>
+                <div class="boot"><Loader2 size={16} class="ui-spin" /> Connecting to {SN}…</div>
             {:else}
                 {#if activeTab === 'Infra'}
                     <InfraTab section={activeSection} sub={activeSub} onNavigate={navigate} />

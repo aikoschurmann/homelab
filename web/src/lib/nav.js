@@ -1,3 +1,4 @@
+import { SN } from './server.js';
 import { Activity, Eye, Boxes, Database, Box, Archive, Terminal, Settings, Network, Server, Gauge, Cloud, Globe } from 'lucide-svelte';
 
 // Sidebar tree. A child with `el` is a section of its page (the element id it scrolls
@@ -48,7 +49,7 @@ export const ALL_TABS = [...TABS, 'Machines', 'Services', 'Hosts'];
 export const tabLabel = (tab) => NAV.flatMap(g => g.items).find(i => i.tab === tab)?.label || tab;
 
 // Hosts: one entry per host that reports through the agent
-export const hostChildren = (list) => [{ id: 'arrakis', label: 'Arrakis', el: null, state: 'running', sep: true },
+export const hostChildren = (list) => [{ id: 'arrakis', label: SN, el: null, state: 'running', sep: true },
     ...(list || []).map(h => ({ id: h.id, label: h.name, el: null, state: h.online ? 'running' : 'stopped' }))];
 
 export const machineChildren = (list) => (list || []).map((m, i) => ({ id: m.name, label: m.name, el: null, state: m.state, sep: i === 0 }));

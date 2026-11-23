@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../lib/server.js';
     import { onMount } from 'svelte';
     import { ExternalLink } from 'lucide-svelte';
     import Tabs from './ui/Tabs.svelte';
@@ -52,7 +53,7 @@
         <div class="ui-head">
             <div>
                 <h1>Tailscale</h1>
-                <p>Every device on <span class="ui-mono">{net.magic_dns}</span>, as Arrakis sees it. Tailscale {net.version}.</p>
+                <p>Every device on <span class="ui-mono">{net.magic_dns}</span>, as {SN} sees it. Tailscale {net.version}.</p>
             </div>
             <div class="ui-head-actions">
                 <a class="ui-btn" href="https://login.tailscale.com/admin/machines" target="_blank" rel="noopener">Admin console <ExternalLink size={13} /></a>

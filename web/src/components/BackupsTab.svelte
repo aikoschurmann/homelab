@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../lib/server.js';
     import { onMount } from 'svelte';
     import { Archive, Trash2, Plus, Download, FolderOpen, Loader2, ExternalLink, Settings2, X } from 'lucide-svelte';
     import { visible } from '../lib/stores.js';
@@ -78,7 +79,7 @@
     $: covered = coverage ? coverage.groups.filter(g => g.items.some(i => i.on && i.last)) : [];
     const savedOf = (g) => g.items.filter(i => i.on && i.last);
     const lastOf = (g) => savedOf(g).map(i => i.last).sort().pop();
-    const KIND = { mac: 'The Mac', machine: 'Machine on Arrakis', host: 'Computer' };
+    const KIND = { mac: 'The Mac', machine: `Machine on ${SN}`, host: 'Computer' };
 
     // ---- actions ------------------------------------------------------------------------
     let triggering = false;

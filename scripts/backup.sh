@@ -1,7 +1,9 @@
 #!/bin/bash
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-# What to back up and where: ~/.homelab_backup.json, edited from the dashboard (Backups → Settings)
-CFG="$HOME/.homelab_backup.json"
+# What to back up and where: $HOMELAB_HOME/backup.json, edited from the dashboard (Backups → Settings)
+HOMELAB_HOME=${HOMELAB_HOME:-$HOME/.config/homelab}
+REPO=$(cd "$(dirname "$0")/.." && pwd)
+CFG="$HOMELAB_HOME/backup.json"
 cfg() { [ -f "$CFG" ] && plutil -extract "$1" raw -o - "$CFG" 2>/dev/null; }
 part_on() { [ "$(cfg "parts.$1")" != false ]; }
 BACKUP_DIR=$(cfg dest); BACKUP_DIR=${BACKUP_DIR:-$HOME/Homelab-Backups/archive}
@@ -11,9 +13,9 @@ TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
 umask 077
 mkdir -p "$BACKUP_DIR"
 
-# The dashboard VM; renaming it from the dashboard rewrites ~/.homelab_vm.json
-VM=${HOMELAB_VM_NAME:-$(sed -n 's/.*"vm_name" *: *"\([^"]*\)".*/\1/p' ~/.homelab_vm.json 2>/dev/null)}
-VM=${VM:-sietch}
+# The dashboard VM; renaming it from the dashboard rewrites $HOMELAB_HOME/vm.json
+VM=${HOMELAB_VM_NAME:-$(sed -n 's/.*"vm_name" *: *"\([^"]*\)".*/\1/p' "$HOMELAB_HOME/vm.json" 2>/dev/null)}
+PORT=$(sed -n 's/.*"port" *: *\([0-9]*\).*/\1/p' "$HOMELAB_HOME/server.json" 2>/dev/null); PORT=${PORT:-5050}
 
 # --- Lock file: prevent multiple instances running at once ---
 LOCKFILE="/tmp/homelab_backup.lock"
@@ -44,22 +46,23 @@ fail() {
 echo "Starting Homelab Backup ($TIMESTAMP)..."
 
 # 1. Backup Jellyfin (macOS) — exclude cache (transcodes, etc.)
-if part_on jellyfin; then
+JF="$HOME/Library/Application Support/Jellyfin"
+if part_on jellyfin && [ -d "$JF" ]; then
 echo "Backing up Jellyfin (macOS)..."
 OUT="$BACKUP_DIR/jellyfin_$TIMESTAMP.tar.gz"
 tar -czf "$OUT" \
     --exclude="Jellyfin/cache" \
-    -C "/Users/muadhib/Library/Application Support" Jellyfin || fail Jellyfin "$OUT"
+    -C "$(dirname "$JF")" Jellyfin || fail Jellyfin "$OUT"
 
 # Also clear the transcode cache to prevent runaway growth
 echo "Clearing Jellyfin transcode cache..."
-rm -rf "/Users/muadhib/Library/Application Support/Jellyfin/cache/transcodes"/*
+rm -rf "$JF/cache/transcodes"/*
 fi
 
 # 2. Backup the dashboard VM's containers: compose stacks + Docker volumes
 #    (Tor onion keys, Conduit DB, pihole config, Portainer). Streamed to the Mac.
 #    Pi-hole's query log and downloaded blocklists are left out (large, rebuilt on their own).
-if part_on vm_data; then
+if part_on vm_data && [ -n "$VM" ] && command -v orb >/dev/null; then
 echo "Backing up containers in $VM (VM)..."
 OUT="$BACKUP_DIR/vm_data_$TIMESTAMP.tar.gz"
 if orb -m "$VM" true 2>/dev/null; then
@@ -101,19 +104,19 @@ done
 #     them into this snapshot as host_<id>_<ts>.tar.gz, and answers once all are in.
 if [ "$(cfg hosts)" -gt 0 ] 2>/dev/null; then
     echo "Collecting folders from other computers..."
-    if ! curl -fsS -m 11000 -X POST "http://127.0.0.1:5050/api/backups/hosts/run?ts=$TIMESTAMP"; then
+    if ! curl -fsS -m 11000 -X POST "http://127.0.0.1:$PORT/api/backups/hosts/run?ts=$TIMESTAMP"; then
         echo "ERROR: other computers backup failed: the dashboard didn't answer"; FAILED=1
     fi
 fi
 
-# 3. Backup Dashboard (macOS) — exclude venv and __pycache__
+# 3. Backup Dashboard: the checkout (no venv/node_modules/build) and its state folder
 if part_on dashboard; then
-echo "Backing up Dashboard (macOS)..."
+echo "Backing up Dashboard..."
 OUT="$BACKUP_DIR/dashboard_$TIMESTAMP.tar.gz"
 tar -czf "$OUT" \
-    --exclude="Homelab-Dashboard/venv" \
-    --exclude="Homelab-Dashboard/__pycache__" \
-    -C "/Users/muadhib" Homelab-Dashboard || fail Dashboard "$OUT"
+    --exclude="venv" --exclude="node_modules" --exclude="__pycache__" --exclude="server/static" --exclude="cache" \
+    -C "$(dirname "$REPO")" "$(basename "$REPO")" \
+    -C "$(dirname "$HOMELAB_HOME")" "$(basename "$HOMELAB_HOME")" || fail Dashboard "$OUT"
 fi
 
 # 4. Backup Server Configurations (macOS): shell, launchd jobs, dashboard state
@@ -121,11 +124,10 @@ fi
 if part_on server_config; then
 echo "Backing up Server Configurations..."
 OUT="$BACKUP_DIR/server_config_$TIMESTAMP.tar.gz"
-cd /Users/muadhib && tar -czf "$OUT" \
-    .zshrc Library/LaunchAgents Homelab-Backups/backup.sh \
-    $(ls -d .homelab_*.json 2>/dev/null) \
-    torchatserver .config/qBittorrent \
-    "Library/Application Support/qBittorrent/BT_backup" || fail "Server config" "$OUT"
+# only what exists here: these are this server's extras, other installs simply skip them
+cd "$HOME" && LIST=(); for d in .zshrc Library/LaunchAgents torchatserver .config/qBittorrent \
+    "Library/Application Support/qBittorrent/BT_backup" $(ls -d .homelab_*.json 2>/dev/null); do [ -e "$d" ] && LIST+=("$d"); done
+tar -czf "$OUT" "${LIST[@]}" || fail "Server config" "$OUT"
 fi
 
 # 4b. Extra folders chosen in the dashboard, together in one archive (absolute paths kept)

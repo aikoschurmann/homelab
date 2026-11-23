@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     // One pool, shaped like a machine's page: icon header, then tabs.
     // Overview (start/stop, live totals, each node) · Jobs (run a script, follow it)
     // · Files (the pool folder's scripts) · Settings (nodes, software, delete).
@@ -327,7 +328,7 @@
             </section>
 
             <section class="ui-card">
-                <div class="ui-card-head"><div><h2 class="ui-card-title">Using it</h2><p class="ui-card-desc">Write a script under <button class="ui-link" on:click={() => setTab('files')}>Files</button> (start from <span class="ui-mono">job.py</span>) and run it under <button class="ui-link" on:click={() => setTab('jobs')}>Jobs</button>. In it, <span class="ui-mono">import pool</span> and <span class="ui-mono">pool.map(fn, items)</span> spreads the calls over every core. From a terminal on Arrakis:</p></div></div>
+                <div class="ui-card-head"><div><h2 class="ui-card-title">Using it</h2><p class="ui-card-desc">Write a script under <button class="ui-link" on:click={() => setTab('files')}>Files</button> (start from <span class="ui-mono">job.py</span>) and run it under <button class="ui-link" on:click={() => setTab('jobs')}>Jobs</button>. In it, <span class="ui-mono">import pool</span> and <span class="ui-mono">pool.map(fn, items)</span> spreads the calls over every core. From a terminal on {SN}:</p></div></div>
                 <div class="ui-card-body"><div class="cmd"><Terminal size={14} /><CopyText text="cd ~/pools/{p.name} && ~/pool/pool.py run job.py" /></div></div>
             </section>
 

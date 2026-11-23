@@ -1,4 +1,5 @@
 <script>
+    import { SN, server, saveServer } from '../lib/server.js';
     import { THEMES, savedTheme, applyTheme, ACCENTS, savedAppearance, applyAppearance } from '../lib/theme.js';
     import { onMount } from 'svelte';
     import { Loader2, Send, ExternalLink, Check, Trash2, Server, Box, ChevronRight, User } from 'lucide-svelte';
@@ -25,6 +26,18 @@
 
     const toast = (m) => window.showToast?.(m);
     const post = (url, body, method = 'POST') => fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) }).then(r => r.json());
+
+    // ---- this server: name and port (server.json) ------------------------------------------
+    let srvName = server.name, srvPort = server.port, srvSaving = false;
+    async function saveSrv() {
+        srvSaving = true;
+        try {
+            const d = await saveServer({ name: srvName, port: Number(srvPort) });
+            if (d.restart_needed) toast(`Saved. The new port applies after the dashboard restarts`);
+            else location.reload();      // the name is read once at load
+        } catch (e) { toast(e.message); }
+        srvSaving = false;
+    }
 
     // ---- appearance ---------------------------------------------------------------------
     let theme = savedTheme();
@@ -172,7 +185,7 @@
     }
     $: places = byOrder([
         { id: 'arrakis', rows: [
-            { level: 0, icon: Server, name: 'Arrakis', kind: 'This server', href: '#infra/arrakis/settings',
+            { level: 0, icon: Server, name: SN, kind: 'This server', href: '#infra/arrakis/settings',
               vals: $machines?.pool ? `OrbStack pool ${cores($machines.pool.cpu)} · ${gbOf($machines.pool.memory_mib)}` : 'OrbStack' },
             ...machineRows($machines?.machines, null),
         ] },
@@ -270,6 +283,23 @@
     <Tabs tabs={TABS} active={tab} onSelect={(t) => onNavigate('Settings', t === 'general' ? null : t)} />
 
     {#if tab === 'general'}
+    <section class="ui-card">
+        <div class="ui-card-head"><div><h2 class="ui-card-title">This server</h2><p class="ui-card-desc">Kept in <span class="ui-mono">{server.home}/server.json</span>.</p></div></div>
+        <div class="rows">
+            <div class="ui-form-row">
+                <div><div class="ui-label">Name</div><div class="ui-hint">What the dashboard calls this computer</div></div>
+                <input class="ui-input srv-name" bind:value={srvName} maxlength="40" />
+            </div>
+            <div class="ui-form-row">
+                <div><div class="ui-label">Port</div><div class="ui-hint">Applies after a restart{#if server.port_active && server.port_active !== server.port} · running on {server.port_active}{/if}</div></div>
+                <input class="ui-input srv-port" type="number" min="1024" max="65535" bind:value={srvPort} />
+            </div>
+        </div>
+        <div class="ui-card-foot"><span>{server.os} · {server.hostname}</span>
+            <span class="ui-btns"><button class="ui-btn sm primary" disabled={srvSaving || !srvName.trim() || (srvName.trim() === server.name && Number(srvPort) === server.port)} on:click={saveSrv}>{srvSaving ? 'Saving…' : 'Save'}</button></span>
+        </div>
+    </section>
+
     <section class="ui-card">
         <div class="ui-card-head"><div><h2 class="ui-card-title">Appearance</h2><p class="ui-card-desc">Saved in this browser.</p></div></div>
         <div class="themes">
@@ -672,4 +702,6 @@
         .pl-row :global(.pl-go) { grid-column: 2; grid-row: 1 / span 2; }
     }
     kbd { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 0 5px; border: 1px solid var(--border-strong); border-radius: 4px; }
+    .srv-name { max-width: 320px; }
+    .srv-port { max-width: 120px; }
 </style>

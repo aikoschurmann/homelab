@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     import { openShell } from '../../lib/terminal.js';
     // Arrakis's page, shaped like a machine's: icon header, then tabs.
     // Overview (usage, where the memory goes, details) · Machines (in the OrbStack VM)
@@ -138,7 +139,7 @@
         <div class="id">
             <span class="icon on"><svelte:component this={hostIcon($arrakisModel, 'macOS')} size={22} /></span>
             <div>
-                <h1>Arrakis <StatusPill state="running" label="Online" /><span class="ui-tag">This server</span></h1>
+                <h1>{SN} <StatusPill state="running" label="Online" /><span class="ui-tag">This server</span></h1>
                 <div class="ui-meta">
                     <span>{$arrakisModel || 'Mac'} · macOS · {cores} cores · {totalMem.toFixed(0)} GB</span>
                     {#if hd['Local IP']}<span>LAN <b class="ui-mono">{hd['Local IP']}</b></span>{/if}
@@ -184,7 +185,7 @@
         <!-- one table: what on Arrakis uses the CPU and memory -->
         <section class="ui-card">
             <div class="ui-card-head">
-                <div><h2 class="ui-card-title">What uses Arrakis</h2><p class="ui-card-desc">The machines run inside the OrbStack VM; apps run on macOS itself.</p></div>
+                <div><h2 class="ui-card-title">What uses {SN}</h2><p class="ui-card-desc">The machines run inside the OrbStack VM; apps run on macOS itself.</p></div>
             </div>
             <div class="use-bar">
                 <div class="ui-segbar tall" title="Memory">
@@ -268,14 +269,14 @@
 
     {:else if tab === 'storage'}
         {#if $disks}
-            <StorageView disks={$disks} onEject={ejectDisk} onMount={mountVolume} hint="Drives plugged into Arrakis show up here within 15 seconds. Eject a drive here before unplugging it." />
+            <StorageView disks={$disks} onEject={ejectDisk} onMount={mountVolume} hint="Drives plugged into {SN} show up here within 15 seconds. Eject a drive here before unplugging it." />
         {:else if $disksError}
             <div class="ui-banner warn">{$disksError}</div>
         {:else}<div class="ui-dim">Reading drives…</div>{/if}
 
     {:else if tab === 'metrics'}
         <div class="ctl">
-            <p class="ui-hint" style="margin: 0">{range.hours === 1 ? '1-minute averages' : range.hours === 24 ? '5-minute averages' : range.hours === 168 ? 'Hourly averages' : '3-hour averages'} · Arrakis as a whole, the VM and macOS together.</p>
+            <p class="ui-hint" style="margin: 0">{range.hours === 1 ? '1-minute averages' : range.hours === 24 ? '5-minute averages' : range.hours === 168 ? 'Hourly averages' : '3-hour averages'} · {SN} as a whole, the VM and macOS together.</p>
             <div class="ui-seg">{#each RANGES as r}<button class:on={range === r} on:click={() => range = r}>{r.label}</button>{/each}</div>
         </div>
         <section class="ui-card">
@@ -292,7 +293,7 @@
         </section>
     {:else if tab === 'settings'}
         <section class="ui-card">
-            <div class="ui-card-head"><div><h2 class="ui-card-title">This server</h2><p class="ui-card-desc">Arrakis runs the dashboard itself, so it reports without an agent.</p></div></div>
+            <div class="ui-card-head"><div><h2 class="ui-card-title">This server</h2><p class="ui-card-desc">{SN} runs the dashboard itself, so it reports without an agent.</p></div></div>
             <div class="rows">
                 <div class="ui-form-row">
                     <div><div class="ui-label">Dashboard address</div><div class="ui-hint">Over Tailscale, from your own devices</div></div>
@@ -305,7 +306,7 @@
             </div>
         </section>
         {#if $machines}
-            <OrbStackSettings data={$machines} hostName="Arrakis">
+            <OrbStackSettings data={$machines} hostName={SN}>
                 <div class="ui-form-row" slot="manage">
                     <div><div class="ui-label">Managed by the dashboard</div><div class="ui-hint">Create, limit and share machines from here</div></div>
                     <span class="ui-dim">Always: this is the server</span>

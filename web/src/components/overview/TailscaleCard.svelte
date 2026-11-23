@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     // Overview's Tailscale card: one line of totals, then online devices split by how they reach Arrakis.
     // Earlier layouts are kept in saved/TailscaleCard.2026-11-20.variants.svelte.
     import { infoPop } from '../../lib/infoPop.js';
@@ -31,8 +32,8 @@
 <section class="ui-card ts-card" id="sec-tailscale">
     <div class="ui-card-head">
         <div>
-            <h2 class="ui-card-title">Tailscale <button type="button" class="info" use:infoPop aria-label="About connections"><Info size={13} /><span class="info-pop" role="tooltip"><b>Direct</b>: Arrakis and the device talk peer to peer, the fastest path.<br /><b>Relayed</b>: traffic goes through a Tailscale relay server because no direct path was found. It works, just slower.<br /><b>Traffic</b>: bytes between Arrakis and each device, counted by Tailscale since it last started on Arrakis. It goes back to zero when Tailscale restarts.</span></button></h2>
-            <p class="ui-card-desc">Devices on {$tailnet?.magic_dns || 'your tailnet'}, as Arrakis sees them.</p>
+            <h2 class="ui-card-title">Tailscale <button type="button" class="info" use:infoPop aria-label="About connections"><Info size={13} /><span class="info-pop" role="tooltip"><b>Direct</b>: {SN} and the device talk peer to peer, the fastest path.<br /><b>Relayed</b>: traffic goes through a Tailscale relay server because no direct path was found. It works, just slower.<br /><b>Traffic</b>: bytes between {SN} and each device, counted by Tailscale since it last started on {SN}. It goes back to zero when Tailscale restarts.</span></button></h2>
+            <p class="ui-card-desc">Devices on {$tailnet?.magic_dns || 'your tailnet'}, as {SN} sees them.</p>
         </div>
         <a class="ui-link more" href="#tailscale">Devices <ArrowRight size={13} /></a>
     </div>
@@ -40,7 +41,7 @@
     <div class="slim">
         <span class="grp"><b>{tsList.length}</b> of {tsPeerTotal} online</span>
         <span class="grp"><b>{tsActive}</b> in use</span>
-        <span class="grp io" title="Counted by Tailscale since it last started on Arrakis">
+        <span class="grp io" title="Counted by Tailscale since it last started on {SN}">
             <span><ArrowDown size={13} /><b>{tsBytes(tsRx)}</b> received</span>
             <span><ArrowUp size={13} /><b>{tsBytes(tsTx)}</b> sent</span>
             <small>since Tailscale started</small>

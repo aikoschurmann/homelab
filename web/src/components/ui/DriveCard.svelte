@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     // One drive, the way a person thinks of it: its volume's name, the hardware in plain
     // words, how full it is. Plumbing (device ids, mount paths) stays in the hover title.
     import { HardDrive, Lock } from 'lucide-svelte';
@@ -7,7 +8,7 @@
     export let fmt = (b) => String(b);  // byte formatter
     export let onEject = null;          // shown for external drives
     export let onMount = null;          // shown when a volume isn't mounted
-    export let host = 'Arrakis';        // whose drive it is, for internal ones
+    export let host = SN;        // whose drive it is, for internal ones
 
     // "PSSD T7" → "Samsung T7", "APPLE SSD AP0256Z" → "Built-in Apple SSD"
     function model(name, internal) {

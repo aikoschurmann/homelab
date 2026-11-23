@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     // OrbStack on one Mac (Arrakis, or a managed host): the pool every machine without its
     // own limit shares, and OrbStack-wide switches. One save bar; then restart OrbStack.
     import { Loader2, RotateCw } from 'lucide-svelte';
@@ -10,7 +11,7 @@
 
     export let data;            // the machines payload: { host, pool, machines }
     export let onHost = null;   // another host's id; null = Arrakis
-    export let hostName = 'Arrakis';
+    export let hostName = SN;
 
     const toast = (m) => window.showToast?.(m);
     $: base = vmBase(onHost);

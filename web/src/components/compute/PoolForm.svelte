@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     // Make a pool or change one: which nodes, how to reach them, what to install.
     import { onMount } from 'svelte';
     import { Check, X, Loader2, Server, Box } from 'lucide-svelte';
@@ -37,7 +38,7 @@
 
     $: picked = cands.filter(c => rows[c.id]?.on);
     // the coordinator: any picked node or VM, or Arrakis without doing work itself
-    $: coords = [...(picked.some(c => c.id === 'arrakis') ? [] : [{ id: 'arrakis', name: 'Arrakis (coordinates only)' }]), ...picked];
+    $: coords = [...(picked.some(c => c.id === 'arrakis') ? [] : [{ id: 'arrakis', name: `${SN} (coordinates only)` }]), ...picked];
     $: if (!loading && !coords.some(c => c.id === scheduler)) scheduler = 'arrakis';
     $: if (!loading && jobsOn !== 'arrakis' && !picked.some(c => c.id === jobsOn)) jobsOn = 'arrakis';   // not before the list is read
     $: totalCores = picked.reduce((a, c) => a + (c.cores || 0), 0);
@@ -91,7 +92,7 @@
     {/if}
 
     <section class="ui-card">
-        <div class="ui-card-head"><div><h2 class="ui-card-title">Nodes</h2><p class="ui-card-desc">Every core of the ones you pick works for the pool: whole machines or the VMs on them (pick only VMs for an identical environment everywhere). Arrakis reaches each over SSH with its own key, so each needs an SSH login that works without a password.</p></div>
+        <div class="ui-card-head"><div><h2 class="ui-card-title">Nodes</h2><p class="ui-card-desc">Every core of the ones you pick works for the pool: whole machines or the VMs on them (pick only VMs for an identical environment everywhere). {SN} reaches each over SSH with its own key, so each needs an SSH login that works without a password.</p></div>
             <span class="tot">{picked.length} picked{totalCores ? ` · ${totalCores} cores` : ''}</span></div>
         {#if loading}<div class="ui-card-body ui-dim">Reading the cluster…</div>
         {:else}
@@ -102,11 +103,11 @@
                         {@const ck = checks[c.id]}
                         <tr class:off={!rows[c.id].on} class:vm={c.vm}>
                             <td><input type="checkbox" bind:checked={rows[c.id].on} aria-label="Use {c.name}" title={c.vm ? `Shares ${sharesWith(c)?.name || "its host"}'s cores: picking it takes ${sharesWith(c)?.name || "the host"} out` : null} on:change={() => exclusive(c)} /></td>
-                            <td><div class="cm"><span class="ic"><svelte:component this={icon(c)} size={15} /></span><div><b>{c.name}</b><div class="ui-dim sub">{[c.vm ? 'VM' : '', c.os, c.cores ? `${c.cores} cores` : '', c.vm && !c.tailnet ? 'Arrakis only' : '', c.online ? '' : (c.vm ? 'stopped' : 'offline')].filter(Boolean).join(' · ')}</div></div></div></td>
+                            <td><div class="cm"><span class="ic"><svelte:component this={icon(c)} size={15} /></span><div><b>{c.name}</b><div class="ui-dim sub">{[c.vm ? 'VM' : '', c.os, c.cores ? `${c.cores} cores` : '', c.vm && !c.tailnet ? `${SN} only` : '', c.online ? '' : (c.vm ? 'stopped' : 'offline')].filter(Boolean).join(' · ')}</div></div></div></td>
                             <td>
                                 <div class="ssh">
                                     <input class="ui-input ui-mono sm" bind:value={rows[c.id].ssh} disabled={!rows[c.id].on} spellcheck="false" on:input={() => delete checks[c.id]} />
-                                    <button type="button" class="ui-btn sm chk" class:ok={ck && !ck.busy && ck.ok} class:bad={ck && !ck.busy && !ck.ok} title={ck && !ck.busy ? ck.message : 'Try logging in from Arrakis'} disabled={!rows[c.id].on || ck?.busy} on:click={() => check(c)}>
+                                    <button type="button" class="ui-btn sm chk" class:ok={ck && !ck.busy && ck.ok} class:bad={ck && !ck.busy && !ck.ok} title={ck && !ck.busy ? ck.message : `Try logging in from ${SN}`} disabled={!rows[c.id].on || ck?.busy} on:click={() => check(c)}>
                                         {#if ck?.busy}<Loader2 size={13} class="ui-spin" />{:else if ck?.ok}<Check size={13} />{:else if ck}<X size={13} />{/if}Check</button>
                                 </div>
                             </td>
@@ -120,7 +121,7 @@
     </section>
 
     <section class="ui-card">
-        <div class="ui-card-head"><div><h2 class="ui-card-title">Software</h2><p class="ui-card-desc">Installed the same way on every node, and on Arrakis for the job itself. Setup commands (clone a repo, install tools) go under <span class="ui-mono">setup:</span> in the pool's <span class="ui-mono">pool.yaml</span>.</p></div></div>
+        <div class="ui-card-head"><div><h2 class="ui-card-title">Software</h2><p class="ui-card-desc">Installed the same way on every node, and on {SN} for the job itself. Setup commands (clone a repo, install tools) go under <span class="ui-mono">setup:</span> in the pool's <span class="ui-mono">pool.yaml</span>.</p></div></div>
         <div class="ui-form-row">
             <div><div class="ui-label">Python packages</div><div class="ui-hint">One per line, like pip: <span class="ui-mono">numpy</span>, <span class="ui-mono">pandas&gt;=2</span></div></div>
             <textarea class="ui-input ui-mono pk" rows="3" bind:value={packages} placeholder="numpy" spellcheck="false"></textarea>
@@ -134,8 +135,8 @@
             <select class="ui-input sel" bind:value={scheduler}>{#each coords as c}<option value={c.id}>{c.name}</option>{/each}</select>
         </div>
         <div class="ui-form-row">
-            <div><div class="ui-label">Jobs run on</div><div class="ui-hint">Arrakis, or a node: then the job script has the pool's whole environment, setup included (files it writes stay there)</div></div>
-            <select class="ui-input sel" bind:value={jobsOn}><option value="arrakis">Arrakis</option>{#each picked.filter(c => c.id !== 'arrakis') as c}<option value={c.id}>{c.name}</option>{/each}</select>
+            <div><div class="ui-label">Jobs run on</div><div class="ui-hint">{SN}, or a node: then the job script has the pool's whole environment, setup included (files it writes stay there)</div></div>
+            <select class="ui-input sel" bind:value={jobsOn}><option value="arrakis">{SN}</option>{#each picked.filter(c => c.id !== 'arrakis') as c}<option value={c.id}>{c.name}</option>{/each}</select>
         </div>
     </section>
 

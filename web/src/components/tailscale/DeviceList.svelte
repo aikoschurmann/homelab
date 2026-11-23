@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../../lib/server.js';
     import { copyText } from '../../lib/clipboard.js';
     import { Search, ExternalLink, Copy, Activity, Server, ChevronDown, ArrowDown, ArrowUp, LayoutGrid, List } from 'lucide-svelte';
     import ResourceCard from '../ui/ResourceCard.svelte';
@@ -57,7 +58,7 @@
     function menu(d) {
         return [
             { label: 'Open', icon: ExternalLink, onClick: () => open(deviceId(d)) },
-            d.online ? { label: 'Ping from Arrakis', icon: Activity, onClick: () => open(deviceId(d), 'ping') } : null,
+            d.online ? { label: `Ping from ${SN}`, icon: Activity, onClick: () => open(deviceId(d), 'ping') } : null,
             { label: 'Copy IP', icon: Copy, onClick: () => copy(d.ip), divider: true },
             d.dns && !isShared(d) ? { label: 'Copy DNS name', icon: Copy, onClick: () => copy(d.dns) } : null,
             { label: 'Tailscale admin', icon: ExternalLink, divider: true, onClick: () => window.open(`https://login.tailscale.com/admin/machines/${d.ip}`, '_blank', 'noopener') },

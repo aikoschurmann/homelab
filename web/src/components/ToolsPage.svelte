@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../lib/server.js';
     // Network tools, four tabs: Checks (ping / port / DNS from several computers at once, one
     // result row per computer), Speed test (Macs), Computers (how each is connected), API health.
     // Routes: #tools, #tools/speed, #tools/computers, #tools/api
@@ -29,9 +30,9 @@
     }
 
     // ---- the computers: Arrakis, its running machines, online cluster hosts -------------------
-    let sources = [{ id: 'mac', name: 'Arrakis', kind: 'host', os: 'macOS' }];
+    let sources = [{ id: 'mac', name: SN, kind: 'host', os: 'macOS' }];
     const srcOf = (id) => sources.find(x => x.id === (id || 'mac'));
-    const srcName = (id) => srcOf(id)?.name || id || 'Arrakis';
+    const srcName = (id) => srcOf(id)?.name || id || SN;
     async function loadSources() {
         const d = await getData('/api/tools/sources');
         if (d?.length) sources = d;
@@ -291,7 +292,7 @@
                                 {#if x.kind === 'machine'}<span class="ui-dim pick-k">machine</span>{/if}
                             </button>
                         {/each}
-                        <div class="pick-foot"><button type="button" class="ui-link" on:click={() => picked = sources.map(x => x.id)}>All</button><button type="button" class="ui-link" on:click={() => picked = ['mac']}>Only Arrakis</button></div>
+                        <div class="pick-foot"><button type="button" class="ui-link" on:click={() => picked = sources.map(x => x.id)}>All</button><button type="button" class="ui-link" on:click={() => picked = ['mac']}>Only {SN}</button></div>
                     </div>
                 {/if}
             </div>

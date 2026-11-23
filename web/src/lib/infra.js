@@ -1,3 +1,4 @@
+import { SN } from './server.js';
 // Infrastructure: one tree for everything that computes, and one route for each node.
 //
 //   #infra                      the whole cluster
@@ -85,7 +86,7 @@ export function tree(machineList, hostList, order = [], poolList = null) {
             children: MACHINE_TABS.map(([s, l]) => tabNode(sec, s, l)),
         };
     };
-    const arrakis = { id: 'arrakis', label: 'Arrakis', kind: 'host', section: 'arrakis', sub: null, state: 'running', children: [
+    const arrakis = { id: 'arrakis', label: SN, kind: 'host', section: 'arrakis', sub: null, state: 'running', children: [
         { id: 'orbstack', label: 'OrbStack VM', kind: 'vm', section: 'arrakis', sub: 'vm', children: (machineList || []).map((m) => machineNode(m)) },
         { id: 'apps', label: 'macOS apps', kind: 'apps', section: 'arrakis', sub: 'apps' },
         tabNode('arrakis', 'storage', 'Storage'),

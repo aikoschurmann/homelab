@@ -1,4 +1,5 @@
 <script>
+    import { SN } from '../lib/server.js';
     import { copyText } from '../lib/clipboard.js';
     import { onMount } from 'svelte';
     import { Search, Send, Copy, Check, Loader2, AlertTriangle, ExternalLink } from 'lucide-svelte';
@@ -161,7 +162,7 @@
             <div class="ui-stat"><span class="ui-stat-label">Median response</span><span class="ui-stat-value">{fmtMs(median(hist.map(r => r.latency)))}</span><span class="ui-stat-sub">{hist.length ? `over the last ${hist.length} ${hist.length === 1 ? 'call' : 'calls'}` : 'never called'}</span></div>
             <div class="ui-stat"><span class="ui-stat-label">Last call</span><span class="ui-stat-value"><span class="code big" class:bad={last && last.status >= 400}>{last ? last.status : '—'}</span>{#if last}<small>{fmtMs(last.latency)}</small>{/if}</span><span class="ui-stat-sub">{last ? when(last.timestamp) : 'no calls recorded'}</span></div>
             <div class="ui-stat"><span class="ui-stat-label">Group</span><span class="ui-stat-value"><button class="grp-link" on:click={() => onNavigate('Endpoints', slug(endpoint.group))}>{endpoint.group}</button></span><span class="ui-stat-sub">{siblings.length + 1} endpoints</span></div>
-            <div class="ui-stat"><span class="ui-stat-label">Kind</span><span class="ui-stat-value">{reads ? 'Read' : 'Change'}</span><span class="ui-stat-sub">{reads ? 'safe to send any time' : 'changes something on Arrakis'}</span></div>
+            <div class="ui-stat"><span class="ui-stat-label">Kind</span><span class="ui-stat-value">{reads ? 'Read' : 'Change'}</span><span class="ui-stat-sub">{reads ? 'safe to send any time' : `changes something on ${SN}`}</span></div>
         </div>
 
         <Tabs tabs={[{ id: 'try', label: 'Try it' }, { id: 'history', label: 'History' }]} active={sub === 'history' ? 'history' : 'try'} onSelect={(t) => onNavigate('Endpoints', endpoint.id, t === 'history' ? 'history' : null)} />
@@ -195,7 +196,7 @@
                 </div>
                 {#if missing.length || confirmSend}
                     <div class="ui-card-foot">
-                        <span>{#if missing.length}Fill in {missing.join(', ')} first.{:else}<span class="warn"><AlertTriangle size={13} /> This sends {endpoint.method} {req.url} and changes something on Arrakis.</span>{/if}</span>
+                        <span>{#if missing.length}Fill in {missing.join(', ')} first.{:else}<span class="warn"><AlertTriangle size={13} /> This sends {endpoint.method} {req.url} and changes something on {SN}.</span>{/if}</span>
                     </div>
                 {/if}
             </section>
