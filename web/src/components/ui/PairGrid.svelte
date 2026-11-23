@@ -1,7 +1,7 @@
 <script>
     // Label/value pairs in two halves where each line holds one pair from each side,
     // so both sides share the line's height and the rules line up.
-    // rows: [[left, right], ...]; a cell is { k, v, copy?, mono?, action?: { label, onClick } } or null
+    // rows: [[left, right], ...]; a cell is { k, v, copy?, mono?, bad?, title?, action?: { label, onClick } } or null
     // heads: optional [leftTitle, rightTitle] above each half
     import CopyText from './CopyText.svelte';
     export let rows = [];
@@ -18,7 +18,7 @@
                 <div class="half" class:empty={!c}>
                     {#if c}
                         <span class="pg-k">{c.k}</span>
-                        <span class="pg-v" class:ui-mono={c.mono}>
+                        <span class="pg-v" class:ui-mono={c.mono} class:bad={c.bad} title={c.title || null}>
                             {#if c.action}<button class="ui-link" on:click={c.action.onClick}>{c.action.label}</button>
                             {:else if c.copy && c.v && c.v !== '—'}<CopyText text={c.v} />
                             {:else}{c.v ?? '—'}{/if}
@@ -37,7 +37,7 @@
         {#each rows.map(p => p[side]).filter(Boolean) as c}
             <div class="half">
                 <span class="pg-k">{c.k}</span>
-                <span class="pg-v" class:ui-mono={c.mono}>
+                <span class="pg-v" class:ui-mono={c.mono} class:bad={c.bad} title={c.title || null}>
                     {#if c.action}<button class="ui-link" on:click={c.action.onClick}>{c.action.label}</button>
                     {:else if c.copy && c.v && c.v !== '—'}<CopyText text={c.v} />
                     {:else}{c.v ?? '—'}{/if}
@@ -58,6 +58,7 @@
     .pg-k { color: var(--text-secondary); }
     .pg-v { color: var(--text-primary); min-width: 0; overflow-wrap: anywhere; line-height: 1.45; }
     .pg-v.ui-mono { font-size: 12.5px; }
+    .pg-v.bad { color: var(--red); font-weight: 500; }
     @media (max-width: 1100px) { .half { grid-template-columns: 120px minmax(0, 1fr); padding: 8px 20px; } }
     .narrow { display: none; }
     .n-h { padding: 12px 14px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border); }
