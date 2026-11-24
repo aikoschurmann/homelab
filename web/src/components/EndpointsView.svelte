@@ -1,4 +1,5 @@
 <script>
+    import MenuSelect from './ui/MenuSelect.svelte';
     import { SN } from '../lib/server.js';
     import { copyText } from '../lib/clipboard.js';
     import { onMount } from 'svelte';
@@ -272,11 +273,11 @@
             <div class="ui-stat"><span class="ui-stat-label">Server errors</span><span class="ui-stat-value">{errors}</span><span class="ui-stat-sub">endpoints whose last call failed</span></div>
         </div>
 
-        <Tabs tabs={[{ id: 'all', label: 'All' }, ...groups.map(g => ({ id: slug(g.name), label: g.name }))]} active={groupFilter || 'all'} onSelect={(t) => onNavigate('Endpoints', t === 'all' ? null : t)} />
-
             <div class="main">
                 <div class="ui-listbar">
                     <label class="ui-search wide"><Search size={14} /><input bind:this={searchEl} placeholder="Search paths, descriptions, parameters…" bind:value={q} on:keydown={searchKey} /><kbd>/</kbd></label>
+                    <MenuSelect heading="Group" value={groupFilter || 'all'} onChange={(t) => onNavigate('Endpoints', t === 'all' ? null : t)}
+                        options={[{ value: 'all', label: 'All groups', hint: all.length }, ...groups.map(g => ({ value: slug(g.name), label: g.name, hint: countIn(g) }))]} />
                     <div class="ui-seg">{#each ['all', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as m}<button class:on={method === m} on:click={() => method = m}>{m === 'all' ? 'All' : m === 'DELETE' ? 'DEL' : m}</button>{/each}</div>
                     <span class="ui-count">{shown.length} of {activeGroup ? countIn(activeGroup) : all.length}</span>
                 </div>
