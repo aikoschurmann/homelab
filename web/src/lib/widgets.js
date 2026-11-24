@@ -100,7 +100,23 @@ function save(l) {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ overview_layout: l }) }).catch(() => {}), 400);
 }
-const update = (fn) => { let cur; layout.subscribe(v => cur = v)(); save(norm(fn(cur))); };
+// Merges belong to a spot between two neighbours, not to the two tiles: after any reorder a
+// merge is kept only if the same two tiles are still side by side, in the same order (the one
+// dragged leaves its merges behind, and two tiles that meet again later don't snap back together).
+const seqOf = (l, kind) => kind === 'metrics' ? l.order.filter(t => !l.hidden.includes(t)).map(t => t.startsWith('m:') ? t.slice(2) : '§' + t)
+    : (l.tile_order[kind] || []).filter(t => !l.hidden_tiles.includes(t));
+const pairs = (s) => new Set(s.slice(1).map((t, i) => s[i] + '|' + t));
+function keepJoins(prev, next) {
+    const tj = { ...next.tile_joins };
+    for (const kind of Object.keys(tj)) {
+        const a = seqOf(prev, kind), b = seqOf(next, kind);
+        if (a.join() === b.join()) continue;
+        const was = pairs(a), now = pairs(b);
+        tj[kind] = tj[kind].filter(k => { const [x, y] = k.split('|'); return (was.has(x + '|' + y) && now.has(x + '|' + y)) || (was.has(y + '|' + x) && now.has(y + '|' + x)); });
+    }
+    return { ...next, tile_joins: tj };
+}
+const update = (fn) => { let cur; layout.subscribe(v => cur = v)(); save(keepJoins(cur, norm(fn(cur)))); };
 const toggle = (list, id) => list.includes(id) ? list.filter(x => x !== id) : [...list, id];
 
 export const toggleWidget = (id) => update(l => ({ ...l, hidden: toggle(l.hidden, id) }));
@@ -110,6 +126,8 @@ export const toggleJoin = (kind, a, b) => update(l => {
     const k = joinKey(a, b), cur = l.tile_joins[kind];
     return { ...l, tile_joins: { ...l.tile_joins, [kind]: cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k] } };
 });
+// drop the merges of a section that fn(a, b) says no longer sit side by side
+export const keepJoinsIf = (kind, fn) => update(l => ({ ...l, tile_joins: { ...l.tile_joins, [kind]: l.tile_joins[kind].filter(k => fn(...k.split('|'))) } }));
 export const setTileOrder = (kind, ids) => update(l => ({ ...l, tile_order: { ...l.tile_order, [kind]: [...ids, ...l.tile_order[kind].filter(x => !ids.includes(x))] } }));
 export const setTotalsCols = (v) => update(l => ({ ...l, totals_cols: v }));
 export const setWidth = (id, w) => update(l => ({ ...l, widths: { ...l.widths, [id]: w } }));

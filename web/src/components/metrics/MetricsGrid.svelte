@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { ChevronLeft, ChevronRight, ChevronDown, Check, Trash2, GripVertical, ChartLine, ChartBarStacked, Gauge } from 'lucide-svelte';
     import MetricCard from './MetricCard.svelte';
-    import { layout, toggleJoin, joinKey } from '../../lib/widgets.js';
+    import { layout, toggleJoin, joinKey, keepJoinsIf } from '../../lib/widgets.js';
     import { tick, beforeUpdate, afterUpdate } from 'svelte';
     import { mlayout, catalog, loadCatalog, removeCard, setCard, splitGauges, cellOf, gridLayout, pushLayout, setPositions, TYPES, SIZES, SIZE_NAMES, NET, RANGES, sizeFor, kindsFor } from '../../lib/metrics.js';
 
@@ -93,6 +93,9 @@
             const p = preview;
             setPositions(cell.n, p);
             arrange(Object.entries(p).sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x).map(([id]) => 'm:' + id));
+            // a merge stays only between two widgets still touching on one row, as tall
+            const touch = (a, b) => a && b && a.y === b.y && a.h === b.h && a.x + a.w === b.x;
+            keepJoinsIf('metrics', (a, b) => !(a in p && b in p) || touch(p[a], p[b]) || touch(p[b], p[a]));
         }
         preview = null; snap = null;
     }
