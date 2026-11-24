@@ -55,8 +55,9 @@
         if (!b) return '0 B';
         const u = ['B', 'KB', 'MB', 'GB', 'TB'];
         let i = Math.min(4, Math.floor(Math.log(b) / Math.log(1024)));
-        if (i < 4 && b / 1024 ** i >= 1000) i++;     // 1016.9 MB reads as 0.99 GB
-        return (b / 1024 ** i).toFixed(i >= 3 ? 2 : i ? 1 : 0) + ' ' + u[i];
+        // stays in MB up to a full GB (1017 MB, not 0.99 GB), so snapshots of about the same size share a unit
+        const v = b / 1024 ** i;
+        return v.toFixed(i >= 3 ? 2 : i && v < 1000 ? 1 : 0) + ' ' + u[i];
     }
     const fmtDate = snapLabel;
     const tsSec = (ts) => ts ? new Date(ts.replace(/_(\d\d)-(\d\d)-(\d\d)$/, 'T$1:$2:$3')).getTime() / 1000 : null;
