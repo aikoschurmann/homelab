@@ -47,6 +47,10 @@ def init_db():
         c.execute('''CREATE TABLE IF NOT EXISTS uptime_checks (timestamp INTEGER, check_id TEXT, ok INTEGER, ms REAL, code INTEGER)''')
         c.execute('CREATE INDEX IF NOT EXISTS idx_uptime_ts ON uptime_checks(timestamp)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_uptime_id_ts ON uptime_checks(check_id, timestamp)')
+        # temperatures, network rate and Wi-Fi per host, a row a minute (app/services/samples.py)
+        c.execute('''CREATE TABLE IF NOT EXISTS samples (timestamp INTEGER, node TEXT, key TEXT, value REAL)''')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_samples_key_node_ts ON samples(key, node, timestamp)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_samples_ts ON samples(timestamp)')
         conn.commit()
         conn.close()
         get_writer() # start background thread
@@ -322,6 +326,7 @@ KEEP = {
     "checks":   ("host_checks",     "Port checks of other hosts", 30, 365),
     "uptime":   ("uptime_checks",   "Uptime checks of websites and services", 30, 365),
     "latency":  ("api_latency",     "API response times", 7, 90),
+    "samples":  ("samples",         "Temperatures, network per host and Wi-Fi", 30, 365),
 }
 
 

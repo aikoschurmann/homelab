@@ -171,6 +171,7 @@ def create_app():
     from app.api.access import access_bp
     from app.api.apps import apps_bp
     from app.api.pihole import pihole_bp
+    from app.api.metrics import metrics_bp
 
     app.register_blueprint(system_bp, url_prefix='/api')
     app.register_blueprint(tmux_bp, url_prefix='/api/tmux')
@@ -193,6 +194,7 @@ def create_app():
     app.register_blueprint(access_bp, url_prefix='/api/access')
     app.register_blueprint(apps_bp, url_prefix='/api/apps')
     app.register_blueprint(pihole_bp, url_prefix='/api/pihole')
+    app.register_blueprint(metrics_bp, url_prefix='/api/metrics')
 
     # Register websocket
     from app.websocket.terminal import register_websocket

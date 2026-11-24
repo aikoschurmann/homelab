@@ -208,6 +208,8 @@ def _parse(text):
         "disk_total": _num(kv.get('disk_total_kb'), int) and _num(kv.get('disk_total_kb'), int) * 1024,
         "disk_used": _num(kv.get('disk_used_kb'), int) and _num(kv.get('disk_used_kb'), int) * 1024,
         "uptime_secs": _num(kv.get('uptime_secs'), int),
+        "net_rx": _num(kv.get('net_rx'), int),
+        "net_tx": _num(kv.get('net_tx'), int),
         "ip": kv.get('ip'),
         "agent": kv.get('agent'),
         "root": kv.get('root') == '1' if 'root' in kv else None,
@@ -313,6 +315,10 @@ def report():
             insert_metrics(h['id'], r["cpu_pct"], (r["mem_used"] or 0) / 2 ** 30)
         except Exception as e:  # noqa: BLE001
             log.warning(f"host metrics {h['name']}: {e}")
+    # network rate for the Metrics page (agent 19 sends its byte counters)
+    if r["net_rx"] is not None:
+        from app.services.samples import net_counters
+        net_counters(h['id'], r["net_rx"], r["net_tx"])
     if r["disk_total"] and time.time() - _last_disk.get(h['id'], 0) >= DISK_EVERY:
         _last_disk[h['id']] = time.time()
         try:
@@ -339,7 +345,7 @@ VERB_FROM = {**{v: 5 for v in ('vm-start', 'vm-stop', 'vm-restart', 'disk-eject'
              'backup-folders': 8, 'backup': 9, 'backup-sizes': 13, 'upgrade': 16, 'upgrade-pkg': 18,
              **{v: 17 for v in ('app-install', 'app-update', 'app-restart', 'app-remove')}}
 NO_TARGET = {'reboot', 'update-agent', 'backup-folders', 'backup-sizes', 'upgrade'}
-AGENT_VERSION = 18          # what install.sh hands out now; bump with every change to AGENT_SH
+AGENT_VERSION = 19          # what install.sh hands out now; bump with every change to AGENT_SH
 BACKUP_FROM = 9             # first agent version that sends folders for the nightly backup (8 had a bug)
 BACKUP_TTL = 3 * 3600       # a big folder can take a while to pack and send
 TARGET_RE = re.compile(r'^[A-Za-z0-9][A-Za-z0-9@._:_-]{0,127}$')
@@ -567,6 +573,9 @@ def inventory():
     sections = _sections(request.get_data(as_text=True)[:2_000_000])
     with _lock:
         _inventory[h['id']] = {"at": time.time(), "sections": sections, "built": {}}
+    # temperatures and Wi-Fi into the Metrics page's history
+    from app.services.samples import from_inventory as samples_from_inventory
+    samples_from_inventory(h['id'], sections)
     return Response('ok\n', mimetype='text/plain')
 
 
@@ -1195,6 +1204,8 @@ snapshot() {
     echo "mem_used: $(vm_stat | awk -v p="$page" '/Pages active/ {a=$3} /Pages wired/ {w=$4} /occupied by compressor/ {c=$5} END {gsub("\\.","",a); gsub("\\.","",w); gsub("\\.","",c); printf "%.0f", (a + w + c) * p}')"
     echo "uptime_secs: $(( $(date +%s) - $(sysctl -n kern.boottime | sed 's/.*{ sec = \([0-9]*\).*/\1/') ))"
     df -Pk /System/Volumes/Data 2>/dev/null | awk 'NR==2 {print "disk_total_kb: " $2; print "disk_used_kb: " $2 - $4}'
+    # bytes in and out on the physical interfaces (en*), for the network graphs
+    netstat -ibn 2>/dev/null | awk '$1 ~ /^en[0-9]/ && $3 ~ /^<Link/ {r += $7; t += $10} END {printf "net_rx: %.0f\nnet_tx: %.0f\n", r, t}'
   else
     . /etc/os-release 2>/dev/null; echo "os: ${PRETTY_NAME:-Linux}"
     echo "cores: $(grep -c ^processor /proc/cpuinfo)"
@@ -1202,6 +1213,11 @@ snapshot() {
     awk '/^MemTotal/ {t=$2} /^MemAvailable/ {a=$2} END {printf "mem_total: %.0f\nmem_used: %.0f\n", t * 1024, (t - a) * 1024}' /proc/meminfo
     echo "uptime_secs: $(cut -d. -f1 /proc/uptime)"
     df -Pk / 2>/dev/null | awk 'NR==2 {print "disk_total_kb: " $2; print "disk_used_kb: " $2 - $4}'
+    # bytes in and out, leaving out loopback, containers' and VPN interfaces (their traffic
+    # already passes through the physical ones)
+    awk 'NR > 2 {sub(/^ */, ""); i = index($0, ":"); n = substr($0, 1, i - 1); split(substr($0, i + 1), f, " ");
+      if (n ~ /^(lo|veth|docker|br-|tailscale|virbr|cni|flannel|kube|zt|wg|tun|tap)/) next; r += f[1]; t += f[9]}
+      END {printf "net_rx: %.0f\nnet_tx: %.0f\n", r, t}' /proc/net/dev 2>/dev/null
   fi
   ip=$(tailscale ip -4 2>/dev/null | head -1)
   [ -n "$ip" ] && echo "ip: $ip"
@@ -1284,6 +1300,17 @@ inventory() {
         echo "#@smart /dev/$dev"; smartctl -j -H -A -i "/dev/$dev" 2>/dev/null
       done
     fi
+  fi
+  # Wi-Fi: signal and link rate, when connected over Wi-Fi
+  if [ "$OS_KIND" = Darwin ]; then
+    echo "#@wifi"; system_profiler SPAirPortDataType 2>/dev/null | sed -n '/Current Network Information:/,/Other Local Wi-Fi Networks:/p' | head -20
+  elif [ -r /proc/net/wireless ] && [ "$(wc -l < /proc/net/wireless)" -gt 2 ]; then
+    echo "#@wifi"; tail -n +3 /proc/net/wireless
+    # NetworkManager's view (signal %, rate) is the dependable one, e.g. on a Raspberry Pi
+    command -v nmcli >/dev/null 2>&1 && nmcli -t -f IN-USE,SIGNAL,RATE,SSID dev wifi list --rescan no 2>/dev/null | grep '^\*' | sed 's/^/nmcli /'
+    for i in $(awk 'NR > 2 {sub(":", "", $1); print $1}' /proc/net/wireless); do
+      echo "iface $i"; command -v iw >/dev/null 2>&1 && iw dev "$i" link 2>/dev/null
+    done
   fi
   if command -v upsc >/dev/null 2>&1; then
     for u in $(upsc -l 2>/dev/null); do echo "#@upsc $u"; upsc "$u" 2>/dev/null; done

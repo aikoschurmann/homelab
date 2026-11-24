@@ -449,26 +449,35 @@ def _mask(url):
     return f"{u.scheme}://{u.netloc}/…{url[-4:]}"
 
 
+# two saves at once (the Overview and its widgets save separately) must not undo each other
+import threading as _threading
+_prefs_lock = _threading.Lock()
+
+
 @system_bp.route('/prefs', methods=['GET', 'POST'])
 def handle_prefs():
     prefs_file = paths.state('prefs')
     import json
     if request.method == 'POST':
+        incoming = request.get_json(silent=True)
+        if not isinstance(incoming, dict):
+            return jsonify({"status": "error", "message": "Expected a JSON object"}), 400
         try:
-            prefs = {}
-            if os.path.exists(prefs_file):
-                with open(prefs_file, 'r') as f:
-                    prefs = json.load(f)
-            incoming = request.get_json(silent=True)
-            if not isinstance(incoming, dict):
-                return jsonify({"status": "error", "message": "Expected a JSON object"}), 400
-            for k in SECRET_PREFS:
-                # the browser only ever saw the masked value; sending it back means "unchanged"
-                if k in incoming and incoming[k] and incoming[k] == _mask(prefs.get(k)):
-                    del incoming[k]
-            prefs.update(incoming)
-            with open(prefs_file, 'w') as f:
-                json.dump(prefs, f)
+            with _prefs_lock:
+                prefs = {}
+                if os.path.exists(prefs_file):
+                    with open(prefs_file, 'r') as f:
+                        prefs = json.load(f)
+                for k in SECRET_PREFS:
+                    # the browser only ever saw the masked value; sending it back means "unchanged"
+                    if k in incoming and incoming[k] and incoming[k] == _mask(prefs.get(k)):
+                        del incoming[k]
+                prefs.update(incoming)
+                # written whole, then swapped in, so a read never sees half a file
+                tmp = prefs_file + '.tmp'
+                with open(tmp, 'w') as f:
+                    json.dump(prefs, f)
+                os.replace(tmp, prefs_file)
             return jsonify({"status": "success"})
         except Exception as e:
             return jsonify({"status": "error", "message": str(e)})

@@ -35,6 +35,9 @@
     // Hash is #tab, #tab/section or #tab/item/subtab, e.g. #machines/casaos/settings
     // old #machines / #services / #hosts links resolve to their Infrastructure node
     const parseHash = () => {
+        // the Metrics page is a section of the Overview now (its editor is the Overview's)
+        const mh = window.location.hash.match(/^#metrics(\/customize)?/i);
+        if (mh) history.replaceState(null, '', '#overview' + (mh[1] ? '/customize' : ''));
         const [t, s, u] = window.location.hash.slice(1).split('/');
         const r = { tab: ALL_TABS.find(x => x.toLowerCase() === (t || '').toLowerCase()), section: s ? decodeURIComponent(s) : null, sub: u || null };
         return legacyRoute(r.tab, r.section, r.sub) || r;
@@ -366,6 +369,7 @@
                 {#if activeTab === 'Backups'}
                     <BackupsTab section={activeSection} onNavigate={navigate} />
                 {/if}
+
 
                 {#if activeTab === 'Overview'}
                     <OverviewTab {stats} {tmux} />

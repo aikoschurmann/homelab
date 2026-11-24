@@ -7,14 +7,12 @@ export const OVERVIEW_WIDGETS = [
     { id: 'webapps', label: 'Web apps' },
     { id: 'attention', label: 'Updates, apps and backups' },
     { id: 'totals', label: 'Cluster totals' },
-    { id: 'host', label: 'Host cards' },
     { id: 'tailscale', label: 'Tailscale' },
     { id: 'shortcuts', label: 'Shortcuts' },
     { id: 'compute', label: 'Compute pools' },
     { id: 'api-latency', label: 'API latency' },
     { id: 'uptime', label: 'Uptime checks' },
     { id: 'pihole', label: 'Pi-hole' },
-    { id: 'machines', label: 'Machines' },
 ];
 // pages the shortcuts section can link to; the Overview fills in each one's figure
 export const SHORTCUTS = [
@@ -24,6 +22,10 @@ export const SHORTCUTS = [
     { id: 'endpoints', label: 'API endpoints' },
 ];
 const SC_IDS = SHORTCUTS.map(x => x.id);
+// a section's kind, for a copy of it too ('tailscale#k3x' → 'tailscale')
+export const baseOf = (t) => String(t).split('#')[0];
+// another of something already on the page gets a tag of its own
+export const copyOf = (t) => t + '#' + Math.random().toString(36).slice(2, 6);
 const IDS = OVERVIEW_WIDGETS.map(w => w.id);
 
 // sections made of tiles, whose tiles can be hidden one by one
@@ -31,6 +33,21 @@ export const SECTION_TILES = {
     attention: [{ id: 'updates', label: 'Package updates' }, { id: 'apps', label: 'Apps' }, { id: 'backups', label: 'Backups' }],
     totals: [{ id: 'hosts', label: 'Hosts' }, { id: 'cpu', label: 'CPU' }, { id: 'mem', label: 'Memory' }, { id: 'disk', label: 'Storage' }],
 };
+// the tiles' order inside each section (tiles added since come last)
+function tileOrder(o = {}) {
+    return Object.fromEntries(Object.entries(SECTION_TILES).map(([k, ts]) => {
+        const ids = ts.map(t => t.id), saved = (o?.[k] || []).filter(x => ids.includes(x));
+        return [k, [...saved, ...ids.filter(x => !saved.includes(x))]];
+    }));
+}
+// which neighbouring tiles share one card (a line between them instead of a gap), per section;
+// a pair is 'a|b' in either order. Updates, apps and backups start as one card.
+export const joinKey = (a, b) => [a, b].sort().join('|');
+function tileJoins(j) {
+    // 'metrics': metric widgets next to each other, by widget id
+    const def = { totals: [], attention: [joinKey('updates', 'apps'), joinKey('apps', 'backups')], metrics: [] };
+    return Object.fromEntries(Object.keys(def).map(k => [k, Array.isArray(j?.[k]) ? j[k] : def[k]]));
+}
 // how many cluster tiles per row ('auto' follows the screen width)
 export const COLS = ['auto', '1', '2', '3', '4'];
 
@@ -41,16 +58,22 @@ const OLD = 'overview_hidden_widgets_v2';
 
 function norm(l = {}) {
     // sections added since the layout was saved go in at their default place
-    const order = (l.order || []).filter(id => IDS.includes(id));
+    // metric widgets sit among the sections as 'm:<widget id>' ('metrics': where they all went before)
+    // host cards each on their own as 'h:<host id>' ('host': where they all were before; a fresh
+    // page starts with them there)
+    const src = l.order?.length ? l.order : [...IDS.slice(0, IDS.indexOf('totals') + 1), 'host'];
+    // items: a section ('tailscale', a copy 'tailscale#k3x'), a metric widget 'm:<id>', a host's card
+    // 'h:<id>', a machine's card 'v:<name>' (cards and copies can be there more than once)
+    const order = src.filter(id => IDS.includes(baseOf(id)) || /^[mhv]:/.test(id) || ['metrics', 'host', 'machines'].includes(id));
     IDS.forEach((id, i) => {
         if (order.includes(id)) return;
         const before = IDS.slice(0, i).reverse().find(p => order.includes(p));
         order.splice(before ? order.indexOf(before) + 1 : 0, 0, id);
     });
     return { order, hidden: (l.hidden || []).filter(id => IDS.includes(id)), hidden_hosts: l.hidden_hosts || [],
-        hidden_tiles: l.hidden_tiles || [], totals_cols: COLS.includes(l.totals_cols) ? l.totals_cols : 'auto',
+        hidden_tiles: l.hidden_tiles || [], tile_order: tileOrder(l.tile_order), tile_joins: tileJoins(l.tile_joins), totals_cols: COLS.includes(l.totals_cols) ? l.totals_cols : 'auto',
         // sections at half width sit two to a row
-        widths: Object.fromEntries(Object.entries(l.widths || {}).filter(([k, v]) => IDS.includes(k) && v === 'half')),
+        widths: Object.fromEntries(Object.entries(l.widths || {}).filter(([k, v]) => IDS.includes(baseOf(k)) && v === 'half')),
         shortcuts: Array.isArray(l.shortcuts) ? l.shortcuts.filter(x => SC_IDS.includes(x)) : ['databases', 'terminal'] };
 }
 
@@ -83,12 +106,66 @@ const toggle = (list, id) => list.includes(id) ? list.filter(x => x !== id) : [.
 export const toggleWidget = (id) => update(l => ({ ...l, hidden: toggle(l.hidden, id) }));
 export const toggleHostCard = (id) => update(l => ({ ...l, hidden_hosts: toggle(l.hidden_hosts, id) }));
 export const toggleTile = (id) => update(l => ({ ...l, hidden_tiles: toggle(l.hidden_tiles, id) }));
+export const toggleJoin = (kind, a, b) => update(l => {
+    const k = joinKey(a, b), cur = l.tile_joins[kind];
+    return { ...l, tile_joins: { ...l.tile_joins, [kind]: cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k] } };
+});
+export const setTileOrder = (kind, ids) => update(l => ({ ...l, tile_order: { ...l.tile_order, [kind]: [...ids, ...l.tile_order[kind].filter(x => !ids.includes(x))] } }));
 export const setTotalsCols = (v) => update(l => ({ ...l, totals_cols: v }));
 export const setWidth = (id, w) => update(l => ({ ...l, widths: { ...l.widths, [id]: w } }));
 export const setShortcuts = (list) => update(l => ({ ...l, shortcuts: list }));
 export const setWidgetOrder = (order) => update(l => ({ ...l, order }));
 export const showAllWidgets = () => update(l => ({ ...l, hidden: [], hidden_hosts: [], hidden_tiles: [] }));
 export const resetLayout = () => update(() => ({}));
+
+// keep the metric widgets in the order: new ones where the old Metrics section was (else after
+// the cluster totals for a first set, else at the end), removed ones out
+export function syncMetrics(cardIds) {
+    let cur; layout.subscribe(v => cur = v)();
+    const want = cardIds.map(i => 'm:' + i), wantSet = new Set(want);
+    let order = cur.order.filter(t => !t.startsWith('m:') || wantSet.has(t));
+    const missing = want.filter(t => !order.includes(t));
+    const old = order.indexOf('metrics');
+    if (old >= 0) order.splice(old, 1, ...missing);
+    else if (missing.length) {
+        const first = !order.some(t => t.startsWith('m:'));
+        const at = first && order.includes('totals') ? order.indexOf('totals') + 1 : order.length;
+        order.splice(at, 0, ...missing);
+    }
+    if (order.join() !== cur.order.join()) save(norm({ ...cur, order }));
+}
+// the old "Host cards" section becomes a card per host it showed, where it was (once)
+export function syncHosts(hostIds) {
+    let cur; layout.subscribe(v => cur = v)();
+    if (!cur.order.includes('host')) return;
+    const tokens = cur.hidden.includes('host') ? [] : hostIds.filter(h => !cur.hidden_hosts.includes(h)).map(h => 'h:' + h).filter(t => !cur.order.includes(t));
+    save(norm({ ...cur, order: cur.order.flatMap(t => t === 'host' ? tokens : [t]), hidden: cur.hidden.filter(x => x !== 'host') }));
+}
+// the old Machines section becomes a card per machine, where it was (once; dropped if hidden)
+export function syncMachines(names) {
+    let cur; layout.subscribe(v => cur = v)();
+    if (!cur.order.includes('machines')) return;
+    const tokens = cur.hidden.includes('machines') ? [] : names.map(n => 'v:' + n).filter(t => !cur.order.includes(t));
+    save(norm({ ...cur, order: cur.order.flatMap(t => t === 'machines' ? tokens : [t]), hidden: cur.hidden.filter(x => x !== 'machines') }));
+}
+// insert items (section ids or tokens) before or after another, or at the end
+export function placeItems(items, target) {
+    let cur; layout.subscribe(v => cur = v)();
+    const o = cur.order.filter(t => !items.includes(t));
+    let at = target ? o.indexOf(target.id) : -1;
+    at = at < 0 ? o.length : at + (target.after ? 1 : 0);
+    o.splice(at, 0, ...items);
+    save(norm({ ...cur, order: o, hidden: cur.hidden.filter(x => !items.includes(x)) }));
+}
+// these items in this order, each taking one of the places they hold now
+export const reorderWithin = (tokens) => update(l => {
+    const set = new Set(tokens), o = [...l.order];
+    let k = 0;
+    o.forEach((t, i) => { if (set.has(t)) o[i] = tokens[k++]; });
+    return { ...l, order: o };
+});
+// a widget dropped from the page (its settings are removed with it)
+export const orderWithout = (token) => update(l => ({ ...l, order: l.order.filter(t => t !== token) }));
 
 // How tall each section really is on the Overview (and how wide it was), per width, so the
 // Customize preview can draw every section at its true proportions. Kept in this browser.

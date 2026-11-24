@@ -3,8 +3,15 @@
     import { infoPop } from '../lib/infoPop.js';
     import { onMount } from 'svelte';
     import { Database, Terminal, ArrowRight, Archive, SlidersHorizontal, Check, Info, PackageCheck, Store, ScrollText, Network, Cloud, ShieldCheck, Eye } from 'lucide-svelte';
-    import { layout, hiddenWidgets, fetchLayout, measureSection } from '../lib/widgets.js';
-    import CustomizeMenu from './overview/CustomizeMenu.svelte';
+    import { layout, hiddenWidgets, fetchLayout, measureSection, syncMetrics, syncHosts, syncMachines, placeItems, orderWithout, baseOf, copyOf } from '../lib/widgets.js';
+    import { mlayout, loadLayout as loadMetrics } from '../lib/metrics.js';
+    import SectionSettings from './overview/SectionSettings.svelte';
+    import WidgetGallery from './overview/WidgetGallery.svelte';
+    import { sortable } from '../lib/sortable.js';
+    import { setWidgetOrder, toggleWidget, resetLayout, setWidth, setTileOrder, toggleJoin, reorderWithin, OVERVIEW_WIDGETS, SECTION_TILES, COLS, toggleTile, setTotalsCols } from '../lib/widgets.js';
+    import { removeCard, addCard } from '../lib/metrics.js';
+    import { tick } from 'svelte';
+    import { Plus, RotateCcw, Pencil, Trash2, ChevronLeft, ChevronRight, GripVertical } from 'lucide-svelte';
     // #overview/customize shows the layout editor in place of the page
     let customizing = typeof location !== 'undefined' && location.hash === '#overview/customize';
     onMount(() => { const f = () => customizing = location.hash === '#overview/customize'; window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f); });
@@ -15,7 +22,7 @@
     import WebAppsCard from './WebAppsCard.svelte';
     import { fetchDisks } from '../lib/storage.js';
     import { updates } from '../lib/updates.js';
-    import { hosts, fetchHosts } from '../lib/hosts.js';
+    import { hosts, fetchHosts, hostOrder, byOrder } from '../lib/hosts.js';
     import { fetchTailnet } from '../lib/tailscale.js';
     import TailscaleCard from './overview/TailscaleCard.svelte';
     import ComputeCard from './overview/ComputeCard.svelte';
@@ -26,6 +33,7 @@
     import { cloudflare, isActive } from '../lib/cloudflare.js';
     import LiveChart from './ui/LiveChart.svelte';
     import AttentionRow from './overview/AttentionRow.svelte';
+    import MetricsGrid from './metrics/MetricsGrid.svelte';
 
     export let stats;
     export let tmux;
@@ -243,14 +251,33 @@
     let vw = 1440, totRows = 1;
     $: narrow = vw <= 1000;
     // the shown sections in order, consecutive half-width ones grouped into pairs of columns
+    // what is on the page, in order: sections and metric widgets ('m:<id>')
+    $: cardIds = new Set($mlayout.cards.map(c => c.id));
+    // every host, in the shared host order (a host card is 'h:<id>')
+    $: hostIds = byOrder([{ id: 'arrakis' }, ...($hosts || [])], $hostOrder).map(h => h.id);
+    $: cardHostName = (hid) => hid === 'arrakis' ? SN : ($hosts || []).find(h => h.id === hid)?.name || hid;
+    $: machineNames = ($machines?.machines || []).map(m => m.name);
+    // what is on the page: metric widgets, host and machine cards, sections and copies of them
+    $: shown = $layout.order.filter(t => t.startsWith('m:') ? cardIds.has(t.slice(2))
+        : t.startsWith('h:') ? hostIds.includes(baseOf(t.slice(2)))
+        : t.startsWith('v:') ? machineNames.includes(baseOf(t.slice(2)))
+        : !!label[baseOf(t)] && (t.includes('#') || show(t)));
     $: groups = (() => {
         const out = [];
-        for (const id of $layout.order.filter(show)) {
+        for (const id of shown) {
+            // metric widgets next to each other share one grid
+            if (id.startsWith('m:')) { const last = out.at(-1); if (last?.metric) last.ids.push(id); else out.push({ key: id, metric: true, ids: [id] }); continue; }
+            // host cards next to each other sit side by side, as cards do
+            if (id.startsWith('h:') || id.startsWith('v:')) { const last = out.at(-1); if (last?.hostrun) last.ids.push(id); else out.push({ key: id, hostrun: true, ids: [id] }); continue; }
+            if (id === 'metrics') continue;
             const half = $layout.widths[id] === 'half', last = out.at(-1);
             if (half && narrow) { out.push({ key: id, half: false, ids: [id] }); continue; }
             if (half && last?.half) last.ids.push(id);
             else out.push({ key: id, half, ids: [id] });
         }
+        // a line of cards keeps its block while only the order inside it changes (a key from its
+        // first item would rebuild it, the page shrinking for a moment and the scroll jumping)
+        for (const g of out) if (g.half || g.hostrun) g.key = (g.half ? 'p:' : 'h:') + [...g.ids].sort().join(',');
         return out;
     })();
     // the shortcuts picked under Customize: each page with one figure of what it holds
@@ -268,8 +295,140 @@
     };
     const fmtMs = (ms) => (ms < 10 ? ms.toFixed(1) : Math.round(ms)) + ' ms';
 
+    // ---- customizing: the page itself, each section and widget with the same tools ----------
+    const label = Object.fromEntries(OVERVIEW_WIDGETS.map(w => [w.id, w.label]));
+    const hiddenSet = () => new Set($layout.hidden);
+    // a drag or an arrow reorders what is shown; hidden sections keep their slot
+    // while a reorder settles, the page keeps at least its height (sections being re-made are
+    // shorter for a moment; near the bottom that would pull the scroll up)
+    let holdT = 0;
+    function holdHeight() {
+        if (!secsEl) return;
+        secsEl.style.minHeight = Math.max(secsEl.offsetHeight, parseFloat(secsEl.style.minHeight) || 0) + 'px';
+        clearTimeout(holdT); holdT = setTimeout(() => { if (secsEl) secsEl.style.minHeight = ''; }, 900);
+    }
+    function moveShown(ids) {
+        holdHeight();
+        const on = new Set(shown), keep = (id) => !on.has(id);
+        let k = 0;
+        setWidgetOrder($layout.order.map(id => keep(id) ? id : ids[k++]));
+    }
+    function moveBy(id, d) {
+        const o = [...shown], i = o.indexOf(id), j = i + d;
+        if (i < 0 || j < 0 || j >= o.length) return;
+        [o[i], o[j]] = [o[j], o[i]];
+        // the others glide to their new places, as when dragging
+        const rowsOf = () => [...secsEl.querySelectorAll('[data-id]')].filter(x => x.parentElement.closest('[data-sort-root]') === secsEl);
+        const was = new Map(rowsOf().map(x => [x.dataset.id, x.getBoundingClientRect()]));
+        moveShown(o);
+        tick().then(() => requestAnimationFrame(() => {
+            for (const x of rowsOf()) {
+                const a = was.get(x.dataset.id), b = x.getBoundingClientRect();
+                if (!a || (Math.abs(a.left - b.left) < 1 && Math.abs(a.top - b.top) < 1)) continue;
+                x.animate([{ transform: `translate(${a.left - b.left}px, ${a.top - b.top}px)` }, { transform: 'none' }], { duration: 200, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' });
+            }
+        }));
+    }
+    let setOpen = false, setId = null, galOpen = false;
+    const tileName = Object.fromEntries(Object.values(SECTION_TILES).flat().map(t => [t.id, t.label]));
+    // a section's width as laid out, and how many totals tiles fit across it (as InfraIndex: >= ~240px each)
+    $: secW = (id) => $layout.widths[id] === 'half' && !narrow ? (secsW - 16) / 2 : secsW;
+    $: totShown = ($layout.tile_order.totals || []).filter(t => !$layout.hidden_tiles.includes(t));
+    // the per-row choices that do something here: no more than fit, nor than there are tiles
+    $: colChoices = (id) => { const most = Math.min(totShown.length, Math.max(1, Math.floor((secW(id) + 12) / 252))); return COLS.filter(c => c === 'auto' || +c <= most); };
+    // Fit leaves the Hosts tile out below 1000px: its toggle would do nothing
+    $: tileChoices = (id, kind) => ($layout.tile_order[kind] || []).filter(t => !(kind === 'totals' && t === 'hosts' && String($layout.totals_cols) === 'auto' && secW(id) < 1000));
+    const isCard = (t) => t.startsWith('h:') || t.startsWith('v:');
+    const nameOf = (t) => t.startsWith('h:') ? cardHostName(baseOf(t.slice(2))) : t.startsWith('v:') ? baseOf(t.slice(2)) : label[baseOf(t)] || t;
+    // a card or a copy leaves the page; a section itself is hidden (it keeps its place for later)
+    const removeItem = (t) => isCard(t) || t.includes('#') ? orderWithout(t) : toggleWidget(t);
+    // another of something already there is a copy of it
+    const fresh = (t) => $layout.order.includes(t) && (isCard(t) || shown.includes(t)) ? copyOf(t) : t;
+
+    // ---- adding from the gallery: a click puts it at the end, a drag where it is let go ------
+    let secsEl, secsW = 1100;
+    // put what was picked on the page: section (or a copy), a card, metric widget(s); its items
+    function create(spec) {
+        if (spec.kind === 'section') { const t = fresh(spec.id); setWidthOf(t, spec.width); return [t]; }
+        if (spec.kind === 'host') return [fresh('h:' + spec.id)];
+        if (spec.kind === 'machine') return [fresh('v:' + spec.id)];
+        const each = spec.each?.length ? spec.each : null;
+        return (each ? each.map(n => addCard({ ...spec.card, node: n })) : [addCard(spec.card)]).map(i => 'm:' + i);
+    }
+    async function settle(items) {
+        galOpen = false;
+        await tick();
+        secsEl?.querySelector(`[data-id="${items[0]}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // what was added fades in (all of it: a gauge per host is several)
+        for (const t of items) { const x = secsEl?.querySelector(`[data-id="${t}"]`); if (x) { x.classList.add('added'); setTimeout(() => x.classList.remove('added'), 700); } }
+    }
+    // a click: at the end of the page
+    function add(spec) { const items = create(spec); placeItems(items, null); settle(items); }
+
+    // a drag from the gallery works as moving does: the new item itself is on the page at once,
+    // faded with a dashed outline, the page making room for it wherever the pointer is
+    let drag = null, ghost = null, scrollT = null, lastY = 0;
+    const els = (items) => items.map(t => secsEl?.querySelector(`[data-id="${t}"]`)).filter(Boolean);
+    function mark(items, on) { for (const x of els(items)) Object.assign(x.style, on ? { opacity: '.35', outline: '2px dashed var(--accent)', outlineOffset: '-2px' } : { opacity: '', outline: '', outlineOffset: '' }); }
+    async function startDrag(spec, e, el) {
+        const r = el.getBoundingClientRect();
+        ghost = el.cloneNode(true);
+        Object.assign(ghost.style, { position: 'fixed', left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', zIndex: 900, pointerEvents: 'none', opacity: '.92', borderRadius: '8px', boxShadow: '0 18px 44px rgba(0,0,0,.5)', transition: 'none' });
+        document.body.appendChild(ghost);
+        // where everything else is (page coordinates), before the new item takes a place
+        const others = [...secsEl.querySelectorAll('[data-id]')].filter(x => x.parentElement.closest('[data-sort-root]') === secsEl).sort((a, b) => (+a.dataset.n || 0) - (+b.dataset.n || 0))
+            .map(x => { const b = x.getBoundingClientRect(); return { id: x.dataset.id, cx: b.left + b.width / 2, cy: b.top + b.height / 2 + scrollY, h: b.height }; });
+        const hidden0 = [...$layout.hidden];
+        const items = create(spec);
+        drag = { items, others, dx: e.clientX - r.left, dy: e.clientY - r.top, at: -1, hidden0 };
+        window.addEventListener('pointermove', dragMove);
+        window.addEventListener('pointerup', dragEnd);
+        window.addEventListener('keydown', dragKey);
+        scrollT = setInterval(() => { if (lastY < 90) window.scrollBy(0, -14); else if (lastY > window.innerHeight - 90) window.scrollBy(0, 14); }, 16);
+        dragMove(e);
+    }
+    function dragMove(e) {
+        if (!drag) return;
+        lastY = e.clientY;
+        ghost.style.left = e.clientX - drag.dx + 'px'; ghost.style.top = e.clientY - drag.dy + 'px';
+        // as moving: the items before the pointer (above it, or level with it and to its left)
+        const py = e.clientY + scrollY;
+        const t = drag.others.filter(x => Math.abs(x.cy - py) <= x.h / 2 ? x.cx < e.clientX : x.cy < py).length;
+        if (t === drag.at) return;
+        drag.at = t;
+        mark(drag.items, false);
+        placeItems(drag.items, drag.others[t] ? { id: drag.others[t].id, after: false } : null);
+        tick().then(() => requestAnimationFrame(() => drag && mark(drag.items, true)));
+    }
+    function dragStop() {
+        window.removeEventListener('pointermove', dragMove);
+        window.removeEventListener('pointerup', dragEnd);
+        window.removeEventListener('keydown', dragKey);
+        clearInterval(scrollT); ghost?.remove(); ghost = null;
+        if (drag) mark(drag.items, false);
+    }
+    function dragEnd() { const d = drag; dragStop(); drag = null; if (d) settle(d.items); }
+    // Esc: it was never added
+    function dragKey(e) {
+        if (e.key !== 'Escape' || !drag) return;
+        const d = drag; dragStop(); drag = null;
+        for (const t of d.items) {
+            if (t.startsWith('m:')) removeCard(t.slice(2));
+            if (d.hidden0.includes(t)) toggleWidget(t); else orderWithout(t);
+        }
+    }
+    const setWidthOf = (id, w) => setWidth(id, w);
+    const openSettings = (id) => { setId = id; setOpen = true; };
+    const done = () => { location.hash = '#overview'; };
+
+    // the metric widgets take their places among the sections once both layouts are in
+    let both = false;
+    $: both && syncMetrics($mlayout.cards.map(c => c.id));
+    $: both && $hosts && syncHosts(hostIds);
+    $: both && $machines && syncMachines(machineNames);
     onMount(() => {
-        fetchLayout(); fetchHistory(); fetchDatabases(); fetchBackup(); fetchTailnet(); fetchEndpoints(); fetchMachines(); fetchMachineUsage(); fetchServices(); fetchHosts(); fetchDisks();
+        Promise.all([fetchLayout(), loadMetrics()]).then(() => both = true);
+        fetchHistory(); fetchDatabases(); fetchBackup(); fetchTailnet(); fetchEndpoints(); fetchMachines(); fetchMachineUsage(); fetchServices(); fetchHosts(); fetchDisks();
         const tick = setInterval(() => now = Date.now(), 1000);
         const poll = setInterval(() => {
             if (!visible()) return;
@@ -282,10 +441,20 @@
 </script>
 
 <svelte:window bind:innerWidth={vw} on:click={(e) => !e.target.closest?.(".lat-tip, .hit") && unpin()} on:keydown={e => e.key === 'Escape' && unpin()} />
-{#if customizing}
-<CustomizeMenu mode="editor" />
-{:else}
-<div class="ui-page">
+<div class="ui-page" class:editing={customizing}>
+    {#if customizing}
+    <div class="ui-head">
+        <div>
+            <h1>Customize overview</h1>
+            <p class="ed-p">Drag sections by their header and widgets to arrange them; change a section from its header. Saved for every device.</p>
+        </div>
+        <div class="ui-head-actions">
+            <button class="ui-btn primary" on:click={() => galOpen = true}><Plus size={14} /> Add</button>
+            <button class="ui-btn" on:click={resetLayout}><RotateCcw size={14} /> Reset</button>
+            <button class="ui-btn" on:click={done}>Done</button>
+        </div>
+    </div>
+    {:else}
     <div class="ui-head">
         <div>
             <h1>Overview</h1>
@@ -297,20 +466,27 @@
             </div>
         </div>
         <div class="ui-head-actions">
-            <CustomizeMenu mode="button" data={{ arrakis: { cpu: live.cpu ?? cpuNow, mem, disk, cores }, pendingUpdates, updTargets, backupAgo: backup?.last_success ? agoTs(backup.last_success) : null, dbCount: dbList.length, sessions: sessions.length, medianMs }} />
+            <button class="ui-btn" on:click={() => location.hash = '#overview/customize'}><SlidersHorizontal size={14} /> Customize</button>
         </div>
     </div>
+    {/if}
 
     <!-- the sections, in the order and with the cards picked under Customize -->
-    {#snippet section(id)}
+    {#snippet section(tok)}
+    {@const id = baseOf(tok)}
     <div class="msr" use:measureSection={`${id}:${$layout.widths[id] === 'half' && !narrow ? 'half' : 'full'}${id === 'totals' ? ':' + totRows : ''}`}>
     {#if id === 'webapps'}<WebAppsCard />
-    {:else if id === 'attention'}<AttentionRow {now} {pendingUpdates} {updTargets} {backup} hide={$layout.hidden_tiles} />
+    {:else if id === 'attention'}<AttentionRow {now} {pendingUpdates} {updTargets} {backup} hide={$layout.hidden_tiles} order={$layout.tile_order.attention} joins={$layout.tile_joins.attention} onJoin={customizing ? (a, b) => toggleJoin('attention', a, b) : null} onSort={customizing ? (ids) => setTileOrder('attention', ids) : null} />
     {:else if id === 'totals'}
     <!-- the cluster's totals split per host, as on the Infrastructure page -->
-    <div id="sec-totals"><InfraIndex embedded cards={false} bind:rows={totRows} hideTiles={$layout.hidden_tiles} cols={$layout.totals_cols}
+    <div id="sec-totals"><InfraIndex embedded cards={false} bind:rows={totRows} hideTiles={$layout.hidden_tiles} order={$layout.tile_order.totals} joins={$layout.tile_joins.totals} onJoin={customizing ? (a, b) => toggleJoin('totals', a, b) : null} onSort={customizing ? (ids) => setTileOrder('totals', ids) : null} cols={$layout.totals_cols}
             arrakis={{ cpu: live.cpu, mem, disk, cores, os: 'macOS', up: upSince ? (now - upSince) / 1000 : null }}
             vm={{ running: !!vmEngine, cpu: vmCpu, memGb: vmGb, limitGb: pool ? pool.memory_mib / 1024 : null, up: vmEngine?.uptime_seconds }} /></div>
+    {:else if id.startsWith('h:')}
+    <InfraIndex embedded summary={false} only={[id.slice(2)]}
+            arrakis={{ cpu: live.cpu, mem, disk, cores, os: 'macOS', up: upSince ? (now - upSince) / 1000 : null }}
+            vm={{ running: !!vmEngine, cpu: vmCpu, memGb: vmGb, limitGb: pool ? pool.memory_mib / 1024 : null, up: vmEngine?.uptime_seconds }} />
+    {:else if id.startsWith('v:')}<MachinesCard only={[id.slice(2)]} />
     {:else if id === 'host'}
     <div id="sec-host"><InfraIndex embedded summary={false} hiddenIds={$layout.hidden_hosts}
             arrakis={{ cpu: live.cpu, mem, disk, cores, os: 'macOS', up: upSince ? (now - upSince) / 1000 : null }}
@@ -395,22 +571,61 @@
     </div>
     {/snippet}
 
-    <!-- full-width sections one per row; a run of half-width ones as two columns that stack
-         independently (first, third… left; second, fourth… right), so a short one leaves no hole -->
-    <div class="secs">
-    {#each groups as g (g.key)}
-        {#if g.half}
-            <div class="pair">
-                {#each [g.ids.filter((_, i) => i % 2 === 0), g.ids.filter((_, i) => i % 2 === 1)] as col}
-                    <div class="col">{#each col as id (id)}{@render section(id)}{/each}</div>
-                {/each}
+    <!-- full-width sections one per row; a run of half-width ones two to a row, in reading order
+         (first | second, third | fourth…), side by side at the same height -->
+    <!-- customizing: a section is shown as it is, its border dashed and its tools on its corner,
+         just like a widget; a click opens its settings -->
+    <!-- data-group: the cards of one line (host cards, a half-width pair); something of another
+         kind dragged over them treats the line as one block, so it never splits it -->
+    {#snippet item(id, grp = '')}
+        {#if customizing}
+            {@const n = shown.indexOf(id)}
+            {@const kind = baseOf(id)}
+            <div class="ed sec" data-id={id} data-n={n} data-group={grp || null} data-kind={isCard(id) ? 'h' : $layout.widths[id] === 'half' && !narrow ? 'p' : null} data-handle>
+                <!-- its tools, on its top edge while hovered: drag it by the grip (or anywhere on it),
+                     and what it shows, its width, its place, right here (no dialog) -->
+                <div class="tb">
+                    <span class="grip" title="Drag to move {nameOf(id)}"><GripVertical size={14} /></span>
+                    {#if SECTION_TILES[kind]}
+                        <i></i><span class="grp" data-nodrag role="group" aria-label="Tiles shown">{#each tileChoices(id, kind) as t (t)}<button type="button" class="tg" class:on={!$layout.hidden_tiles.includes(t)} aria-pressed={!$layout.hidden_tiles.includes(t)} title="{$layout.hidden_tiles.includes(t) ? 'Show' : 'Hide'} {tileName[t]}" on:click={() => toggleTile(t)}>{tileName[t]}</button>{/each}</span>
+                    {/if}
+                    {#if kind === 'totals' && colChoices(id).length > 2}
+                        <i></i><span class="grp" data-nodrag role="group" aria-label="Tiles per row" title="Tiles per row">{#each colChoices(id) as c}<button type="button" class="tg" class:on={String($layout.totals_cols) === String(c)} on:click={() => setTotalsCols(c)}>{c === 'auto' ? 'Fit' : c}</button>{/each}</span>
+                    {/if}
+                    {#if !isCard(id) && !narrow}
+                        <i></i><span class="grp" data-nodrag role="group" aria-label="Width"><button type="button" class="tg" class:on={$layout.widths[id] !== 'half'} on:click={() => setWidth(id, 'full')}>Full</button><button type="button" class="tg" class:on={$layout.widths[id] === 'half'} on:click={() => setWidth(id, 'half')}>Half</button></span>
+                    {/if}
+                    <i></i>
+                    <span class="grp" data-nodrag>
+                        {#if $layout.widths[id] !== 'half' || narrow}
+                        <button class="ic" title="Move earlier" disabled={n === 0} on:click={() => moveBy(id, -1)}><ChevronLeft size={14} /></button>
+                        <button class="ic" title="Move later" disabled={n === shown.length - 1} on:click={() => moveBy(id, 1)}><ChevronRight size={14} /></button>
+                        {/if}
+                        {#if kind === 'shortcuts' || kind === 'host'}<button class="ic" title="More settings of {nameOf(id)}" on:click={() => openSettings(id)}><Pencil size={13} /></button>{/if}
+                        <button class="ic del" title="Remove {nameOf(id)}" on:click={() => removeItem(id)}><Trash2 size={13} /></button>
+                    </span>
+                </div>
+                <div class="ec" data-sort-root>{@render section(id)}</div>
             </div>
-        {:else}{@render section(g.ids[0])}{/if}
-    {/each}
-    </div>
-</div>
+        {:else}{@render section(id)}{/if}
+    {/snippet}
 
-{/if}
+    <div class="secs" bind:this={secsEl} bind:clientWidth={secsW} use:sortable={{ onMove: (ids) => customizing && moveShown(ids) }}>
+    {#each groups as g (g.key)}
+        {#if g.hostrun}<div class="ui-cardgrid hrun">{#each g.ids as id (id)}{@render item(id, 'h|' + g.key)}{/each}</div>
+        {:else if g.metric}<MetricsGrid ids={g.ids.map(t => t.slice(2))} editing={customizing} nOf={(t) => shown.indexOf(t)} total={shown.length} arrange={reorderWithin} />
+        {:else if g.half}
+            <div class="pair">{#each g.ids as id (id)}{@render item(id, 'p|' + g.key)}{/each}</div>
+        {:else}{@render item(g.ids[0])}{/if}
+    {/each}
+    {#if customizing && !shown.length}<div class="ui-card ui-empty">Nothing on the page. Add sections and widgets with Add.</div>{/if}
+    </div>
+
+    {#if customizing}
+        <SectionSettings bind:open={setOpen} id={setId} />
+        <WidgetGallery bind:open={galOpen} preview={section} pageW={secsW} onPage={shown} dragging={!!drag} onPick={add} onDrag={startDrag} />
+    {/if}
+</div>
 <style>
     /* usage */
     .mtabs { display: flex; align-items: stretch; border-bottom: 1px solid var(--border); border-top: 1px solid var(--border); }
@@ -440,10 +655,46 @@
     .ts-row { grid-template-columns: 2fr 1fr; }
 
     /* sections: full width, or two half-width ones side by side (one column on narrower screens) */
+    /* customizing: each section as it is, border dashed, tools on its corner (as the widgets) */
+    .ed-p { margin: 4px 0 0; font-size: 13.5px; color: var(--text-secondary); }
+    .editing .secs { user-select: none; -webkit-user-select: none; }
+    /* customizing: each section as it is, its border dashed; dragged anywhere on it */
+    .ed { position: relative; display: flex; flex-direction: column; cursor: grab; touch-action: none; border-radius: var(--radius-card, 8px); outline: 1px dashed var(--border-strong); outline-offset: 0; transition: outline-color .12s; }
+    .ed:hover { outline-color: var(--text-secondary); }
+    .ed:global(.dragging) { cursor: grabbing; outline: 1px solid var(--accent); box-shadow: 0 14px 34px rgba(0, 0, 0, .35); }
+    /* (its own layer, so its tiles, which take the pointer, stay under the tools) */
+    .ec { pointer-events: none; position: relative; z-index: 0; }
+    /* its tools: one bar on the top edge, half in the gap above so it hides little of the
+       section; shown while hovered or focused (always on touch) */
+    .tb { position: absolute; top: 0; right: 12px; width: max-content; display: flex; align-items: center; flex-wrap: nowrap; justify-content: flex-end; gap: 2px; padding: 2px; border-radius: 8px; background: var(--surface) linear-gradient(var(--highlight-10), var(--highlight-10)); border: 1px solid var(--border-strong); box-shadow: 0 4px 14px rgba(0, 0, 0, .35); z-index: 3; opacity: 0; transform: translateY(calc(-50% + 3px)); pointer-events: none; transition: opacity .12s, transform .12s; }
+    .ed:hover .tb, .ed:focus-within .tb { opacity: 1; transform: translateY(-50%); pointer-events: auto; }
+    .ed:global(.dragging) .tb { opacity: 0; }
+    @media (hover: none) { .tb { opacity: 1; transform: translateY(-50%); pointer-events: auto; } }
+    /* one line, always: wider than a half-width section, it runs past it from its outer edge */
+    .pair > .ed:first-child .tb { right: auto; left: 12px; }
+    @media (max-width: 760px) { .tb, .pair > .ed:first-child .tb { left: 12px; right: 12px; width: auto; flex-wrap: wrap; } }
+    .tb i { width: 1px; height: 14px; margin: 0 3px; background: var(--border-strong); }
+    .grp { display: flex; align-items: center; gap: 1px; }
+    .grip { width: 20px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: grab; }
+    .tb button { height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
+    .tb button:hover:not(:disabled) { background: var(--highlight-10); color: var(--text-primary); }
+    .tb button:disabled { opacity: .3; cursor: default; }
+    .tb .ic { width: 26px; }
+    .tb .ic.del:hover { color: var(--red); }
+    /* a toggle: what's shown / picked in plain text on a fill, the rest muted */
+    .tb .tg { padding: 0 8px; font-size: 12px; }
+    .tb .tg.on { background: var(--highlight-15); color: var(--text-primary); font-weight: 500; }
+    .hrun { min-width: 0; }
+    .secs :global(.added) { animation: added-in .6s cubic-bezier(0.22, 1, 0.36, 1); }
+    @keyframes added-in { from { opacity: 0; transform: scale(.97); } }
     .msr { display: flex; flex-direction: column; min-width: 0; }
     .secs { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-    .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-    .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+    .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+    /* both of a row as tall as the taller one */
+    .pair > .ed { display: flex; flex-direction: column; }
+    .pair .ec { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .pair .msr { flex: 1; }
+    .pair .msr > :global(*) { flex: 1; }
 
 
     /* shortcuts */

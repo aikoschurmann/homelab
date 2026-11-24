@@ -187,3 +187,38 @@ a.ui-btn { text-decoration: none; }
 /* a setting opened from ⌘K: briefly highlighted where it lives */
 .setting-flash { animation: setting-flash 2.2s ease-out; border-radius: 6px; }
 @keyframes setting-flash { 0%, 25% { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); } 100% { background: transparent; box-shadow: inset 3px 0 0 transparent; } }
+
+/* tiles merged into one card: the gap between two becomes a line (Customize can merge/split);
+   each side takes half the gap, so the line sits where the gap's middle was */
+.tj-r { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; margin-right: calc(-0.5 * var(--g, 12px)); }
+.tj-l { border-left: none !important; border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; margin-left: calc(-0.5 * var(--g, 12px)); }
+/* a merged tile while it is dragged (its copy and the place it leaves): a card of its own again */
+.sort-free { border: 1px solid var(--border) !important; border-radius: var(--radius-card, 8px) !important; margin: 0 !important; }
+.sort-free.dragging { border-color: var(--accent) !important; }
+.sort-free > .tjb { display: none; }
+/* …and the tiles it was merged with let go of it too: their side towards it a card's edge again
+   (by DOM order, so it follows the live reorder); no merge marker on either side of it */
+.sort-free + .tj-l { border-left: 1px solid var(--border) !important; border-top-left-radius: var(--radius-card, 8px) !important; border-bottom-left-radius: var(--radius-card, 8px) !important; margin-left: 0 !important; }
+.tj-r:has(+ .sort-free) { border-top-right-radius: var(--radius-card, 8px) !important; border-bottom-right-radius: var(--radius-card, 8px) !important; margin-right: 0 !important; }
+.sort-free + [data-id] > .tjb { display: none; }
+/* Customize: a tile can be dragged (tinted on hover) and the gap/line before it toggled */
+.tsort > [data-id] { position: relative; cursor: grab; }
+/* (a tint, not an outline: an outline would cut across a merged card's line and corners) */
+.tsort > [data-id]:hover { background-image: linear-gradient(var(--highlight-10), var(--highlight-10)); }
+.tjb { position: absolute; top: 10px; bottom: 10px; left: calc(-0.5 * var(--g, 12px) - 1px); width: 16px; transform: translateX(-50%); z-index: 2; padding: 0; border: none; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+/* (measured from inside the tile's 1px border; on a merged line, on the line's middle) */
+.tj-l > .tjb { left: -0.5px; }
+/* a short pill on the gap (or on the line), accent and full height under the pointer */
+.tjb::after { content: ''; width: 4px; height: 26px; border-radius: 2px; background: var(--border-strong); transition: height .15s, background .12s; }
+.tjb:hover::after { height: 100%; background: var(--accent); }
+
+/* the tools of a widget being customized: toggles on a raised bar, in groups split by a hairline
+   (the bar on a placed section's edge; the Add gallery uses the same, in place) */
+.ui-tools { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 2px; max-width: 100%; padding: 2px; border-radius: 8px; background: var(--surface) linear-gradient(var(--highlight-10), var(--highlight-10)); border: 1px solid var(--border-strong); }
+.ui-tools > i { width: 1px; height: 14px; margin: 0 3px; background: var(--border-strong); }
+.ui-tools .grp { display: flex; align-items: center; flex-wrap: wrap; gap: 1px; }
+.ui-tools .k { padding: 0 6px 0 6px; font-size: 11.5px; color: var(--text-secondary); white-space: nowrap; }
+.ui-tools button { height: 24px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
+.ui-tools button:hover:not(:disabled) { background: var(--highlight-10); color: var(--text-primary); }
+.ui-tools button.on { background: var(--highlight-15); color: var(--text-primary); font-weight: 500; }
+.ui-tools button .dot { width: 6px; height: 6px; border-radius: 50%; }

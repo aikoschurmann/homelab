@@ -1,4 +1,6 @@
 <script>
+    import { sortable } from '../../lib/sortable.js';
+    import { joinKey } from '../../lib/widgets.js';
     import { onMount } from 'svelte';
     import { visible } from '../../lib/stores.js';
 
@@ -10,7 +12,14 @@
     export let updTargets = [];
     export let backup = null;          // /api/backups/details
     export let hide = [];              // parts left out under Customize: 'updates', 'apps', 'backups'
-    $: parts = ['updates', 'apps', 'backups'].filter(x => !hide.includes(x));
+    export let joins = [];             // neighbours that share one card ('a|b'); by default all three
+    export let onJoin = null;          // Customize: (a, b) merge or split two neighbours
+    export let onSort = null;          // Customize: the parts can be dragged into another order (ids)
+    export let order = ['updates', 'apps', 'backups'];   // their order, from Customize
+    $: parts = order.filter(x => !hide.includes(x));
+    // merged with the part before / after it
+    $: jl = (p) => { const i = parts.indexOf(p); return i > 0 && joins.includes(joinKey(parts[i - 1], p)); };
+    $: jr = (p) => { const i = parts.indexOf(p); return i < parts.length - 1 && joins.includes(joinKey(p, parts[i + 1])); };
 
     let apps = null, runs = null;
     async function fetchApps() {
@@ -69,10 +78,18 @@
     $: stale = backup?.last_success && now / 1000 - backup.last_success > 2 * 86400;
 </script>
 
+<!-- Customize: on the gap (or line) before a part, merge it with the one before or split them -->
+{#snippet joinBtn(p)}
+    {#if onJoin && parts.indexOf(p) > 0}
+        <button type="button" class="tjb" data-nodrag title={jl(p) ? 'Split into two cards' : 'Merge into one card'} aria-label={jl(p) ? 'Split into two cards' : 'Merge into one card'} on:click|stopPropagation|preventDefault={() => onJoin(parts[parts.indexOf(p) - 1], p)}></button>
+    {/if}
+{/snippet}
 {#if parts.length}
-<section class="ui-card att" style="grid-template-columns: repeat({parts.length}, minmax(0, 1fr))">
-    {#if parts.includes('updates')}
-    <a class="cell" href="#updates">
+<section class="att" class:tsort={onSort} class:sorting={onSort} style="grid-template-columns: repeat({parts.length}, minmax(0, 1fr))" use:sortable={{ onMove: (ids) => onSort?.(ids) }} on:click={(e) => onSort && e.preventDefault()}>
+    {#each parts as part (part)}
+    {#if part === 'updates'}
+    <a class="cell" class:tj-l={jl('updates')} class:tj-r={jr('updates')} href="#updates" data-id="updates" data-n={parts.indexOf('updates')} data-handle={onSort ? '' : null} draggable="false">
+        {@render joinBtn('updates')}
         <span class="ui-stat-label"><span class="lg">Package updates</span><span class="sm">Updates</span></span>
         <span class="ui-stat-value">{pendingUpdates}<small>{pendingUpdates ? `on ${updAll.length} ${updAll.length === 1 ? 'computer' : 'computers'}` : 'all up to date'}</small></span>
         <div class="ui-segbar wide" title={updAll.map(x => `${x.name}: ${x.n}`).join('\n')}>{#each updSegs as s}<i style="width: {pct(s.n, pendingUpdates)}%; background: var(--metric-net); opacity: {s.shade}"></i>{/each}</div>
@@ -80,9 +97,9 @@
         <span class="ui-stat-sub short">{!pendingUpdates ? 'nothing to install' : updAll.length === 1 ? `all on ${updAll[0].name}` : `most on ${updAll[0].name} (${updAll[0].n})`}</span>
         <span class="ui-stat-sub ui-legend wide">{#each updSegs as s}<span><b style="background: var(--metric-net); opacity: {s.shade}"></b>{s.name} {s.n}</span>{:else}nothing to install{/each}</span>
     </a>
-    {/if}
-    {#if parts.includes('apps')}
-    <a class="cell" href="#apps/installed">
+    {:else if part === 'apps'}
+    <a class="cell" class:tj-l={jl('apps')} class:tj-r={jr('apps')} href="#apps/installed" data-id="apps" data-n={parts.indexOf('apps')} data-handle={onSort ? '' : null} draggable="false">
+        {@render joinBtn('apps')}
         <span class="ui-stat-label">Apps</span>
         <span class="ui-stat-value">{apps ? projects.length : '—'}<small>{apps ? (appUpd.length || appDown.length ? `${appUpd.length + appDown.length} need a look` : 'all fine') : ''}</small></span>
         <div class="ui-segbar wide">{#each appSegs as s}<i style="width: {pct(s.n, projects.length)}%; background: {s.bad ? 'var(--red)' : 'var(--metric-disk)'}; opacity: {s.bad ? 1 : s.shade}"></i>{/each}</div>
@@ -90,9 +107,9 @@
         <span class="ui-stat-sub short" class:bad={appDown.length}>{!apps ? 'Looking…' : appDown.length ? `${appDown.map(p => p.project).join(', ')} not fully running` : appUpd.length ? `${appUpd.map(p => p.project).join(', ')}: newer image` : 'running and up to date'}</span>
         <span class="ui-stat-sub ui-legend wide">{#if !apps}Looking…{:else}{#each appSegs as s}<span class:bad={s.bad}><b style="background: {s.bad ? 'var(--red)' : 'var(--metric-disk)'}; opacity: {s.bad ? 1 : s.shade}"></b>{s.n} {s.name}</span>{:else}no Compose apps yet{/each}{/if}</span>
     </a>
-    {/if}
-    {#if parts.includes('backups')}
-    <a class="cell" href="#backups/runs">
+    {:else if part === 'backups'}
+    <a class="cell" class:tj-l={jl('backups')} class:tj-r={jr('backups')} href="#backups/runs" data-id="backups" data-n={parts.indexOf('backups')} data-handle={onSort ? '' : null} draggable="false">
+        {@render joinBtn('backups')}
         <span class="ui-stat-label"><span class="lg">Backups</span><span class="sm">Backup</span></span>
         <span class="ui-stat-value" class:bad={stale}>{backup?.last_success ? ago(backup.last_success) : '—'}<small>{backup?.running ? 'running now' : backup?.next_run ? `next ${inT(backup.next_run)}` : ''}</small></span>
         <div class="strip wide" aria-label="Backups over the last {DAYS} days">{#each days as d (d.key)}<i class={d.state} title="{d.label}: {d.state === 'ok' ? 'backed up' : d.state === 'bad' ? 'failed' : d.state === 'other' ? 'ran, unfinished' : 'no backup'}"></i>{/each}</div>
@@ -100,14 +117,16 @@
         <span class="ui-stat-sub sub-b">{runs ? `${okDays} of the last ${DAYS} days` : 'Looking…'}</span>
     </a>
     {/if}
+    {/each}
 </section>
 {/if}
 
 <style>
     /* one card in three parts, so it doesn't read as more tiles beside the cluster's */
-    .att { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; }
-    .cell { display: flex; flex-direction: column; gap: 6px; padding: 16px 20px; min-width: 0; text-decoration: none; color: inherit; transition: background .12s; }
-    .cell + .cell { border-left: 1px solid var(--border); }
+    /* its parts as tiles; by default merged into one card, a line between each (see .tj-l/.tj-r) */
+    .att { --g: 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--g); }
+    .cell { display: flex; flex-direction: column; gap: 6px; padding: 16px 20px; min-width: 0; text-decoration: none; color: inherit; transition: background .12s; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 8px); }
+    .sorting { pointer-events: auto; }
     .cell:hover { background: var(--highlight-3); }
     .bad { color: var(--red); }
     .att .ui-segbar { margin-top: 2px; }
@@ -127,6 +146,7 @@
     .sm, .ph { display: none; }
     /* phone: the same three side by side, smaller: label, figure, one grey line */
     @media (max-width: 760px) {
+        .att { --g: 8px; }
         .cell { padding: 12px 12px; gap: 2px; }
         .lg, .short, .sub-b, .cell .ui-stat-value small { display: none; }
         .sm { display: inline; }

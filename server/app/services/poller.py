@@ -252,6 +252,8 @@ def start_all_pollers():
     updates.start()
     from app.services import wol
     wol.start()
+    from app.services import samples
+    samples.start()
 
 def docker_events_loop():
     last_update = 0

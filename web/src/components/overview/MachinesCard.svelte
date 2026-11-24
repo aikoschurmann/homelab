@@ -7,14 +7,16 @@
 
     // The OrbStack machines on this server as cards, the same as the host cards: CPU and
     // memory, and each opens its page. The Overview keeps machines and usage fresh.
-    $: list = $machines?.machines || [];
+    export let only = null;     // just these machines' cards, in this order (the Overview places each on its own)
+    $: all = $machines?.machines || [];
+    $: list = only ? only.map(n => all.find(m => m.name === n)).filter(Boolean) : all;
     const gb = (b) => b == null ? '—' : b >= 2 ** 30 ? (b / 2 ** 30).toFixed(1) + ' GB' : Math.round(b / 2 ** 20) + ' MB';
     const pct = (a, b) => b ? Math.min(100, a / b * 100) : 0;
     const go = (to) => location.hash = to;
     const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 </script>
 
-<div class="ui-cardgrid" id="sec-machines">
+<div class="ui-cardgrid" id={only ? null : 'sec-machines'}>
     {#each list as m (m.name)}
         {@const u = $machineUsage[m.name]}
         {@const on = m.state === 'running'}

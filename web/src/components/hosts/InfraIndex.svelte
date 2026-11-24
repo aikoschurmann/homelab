@@ -1,4 +1,6 @@
 <script>
+    import { sortable } from '../../lib/sortable.js';
+    import { joinKey } from '../../lib/widgets.js';
     import { SN } from '../../lib/server.js';
     // #infra: every host, laid out like the OrbStack VM page — summary tiles split by
     // host, a toolbar, then one ResourceCard per host (or the folder tree as a table).
@@ -20,9 +22,14 @@
     export let summary = true;
     export let cards = true;
     export let hiddenIds = [];
+    export let only = null;       // just these hosts' cards, in this order (the Overview places each card on its own)
     // the Overview's Customize: tiles to leave out, and how many per row ('auto' or '1'–'4')
     export let hideTiles = [];
+    export let order = ['hosts', 'cpu', 'mem', 'disk'];   // the tiles' order, from Customize
     export let cols = 'auto';
+    export let joins = [];        // pairs of neighbouring tiles that share one card ('a|b')
+    export let onJoin = null;     // Customize: (a, b) merge or split two neighbours
+    export let onSort = null;     // Customize: the tiles can be dragged into another order (ids)
     export let rows = 1;          // out: how many rows of tiles (the Overview records height per row)
 
     $: hd = $stats?.host?.details || {};
@@ -124,11 +131,14 @@
     // measured on the tiles' own row, so a half-width section lays out by its own width
     let cw = 1300;
     $: auto = cols === 'auto';
-    $: tiles = ['hosts', 'cpu', 'mem', 'disk'].filter(t => !hideTiles.includes(t) && !(t === 'hosts' && auto && cw < 1000));
-    // a fixed number still never squeezes a tile below about 300px (its legend needs the room)
+    $: tiles = order.filter(t => !hideTiles.includes(t) && !(t === 'hosts' && auto && cw < 1000));
+    // a fixed number still never squeezes a tile below about 240px (as Fit: 4 across from 1000px)
     $: rows = Math.max(1, Math.ceil(tiles.length / perRow));
-    $: perRow = Math.max(1, Math.min(tiles.length, auto ? (cw >= 1000 ? 4 : cw >= 760 ? 3 : cw >= 420 ? 2 : 1) : Math.min(+cols, Math.max(1, Math.floor((cw + 12) / 312)))));
+    $: perRow = Math.max(1, Math.min(tiles.length, auto ? (cw >= 1000 ? 4 : cw >= 760 ? 3 : cw >= 420 ? 2 : 1) : Math.min(+cols, Math.max(1, Math.floor((cw + 12) / 252)))));
     $: gridCols = perRow === tiles.length && perRow > 1 ? tiles.map(t => t === 'hosts' ? 'minmax(0, 0.6fr)' : 'minmax(0, 1fr)').join(' ') : `repeat(${perRow}, minmax(0, 1fr))`;
+    // merged with the tile before / after it: only on the same row
+    $: jl = (t) => { const i = tiles.indexOf(t); return i > 0 && i % perRow !== 0 && joins.includes(joinKey(tiles[i - 1], t)); };
+    $: jr = (t) => { const i = tiles.indexOf(t); return i < tiles.length - 1 && (i + 1) % perRow !== 0 && joins.includes(joinKey(t, tiles[i + 1])); };
     $: spanOf = (t) => { const rest = tiles.length % perRow; return rest && tiles.indexOf(t) === tiles.length - 1 ? perRow - rest + 1 : 1; };
 
     // ---- toolbar -----------------------------------------------------------------------------
@@ -154,18 +164,27 @@
 
     {/if}
 
+    <!-- Customize: on the gap (or line) before a tile, merge it with the one before or split them -->
+    {#snippet joinBtn(t)}
+        {#if onJoin && tiles.indexOf(t) % perRow !== 0}
+            {@const prev = tiles[tiles.indexOf(t) - 1]}
+            <button type="button" class="tjb" data-nodrag title={jl(t) ? 'Split into two cards' : 'Merge into one card'} aria-label={jl(t) ? 'Split into two cards' : 'Merge into one card'} on:click|stopPropagation={() => onJoin(prev, t)}></button>
+        {/if}
+    {/snippet}
     {#if summary}
     {#if tiles.length}
-    <div class="ui-summary cluster" style="grid-template-columns: {gridCols}" bind:clientWidth={cw}>
-        {#if tiles.includes('hosts')}
-        <div class="ui-stat" style="grid-column: span {spanOf('hosts')}">
+    <div class="ui-summary cluster" class:tsort={onSort} style="grid-template-columns: {gridCols}" bind:clientWidth={cw} use:sortable={{ onMove: (ids) => onSort?.(ids) }}>
+        {#each tiles as t (t)}
+        {#if t === 'hosts'}
+        <div class="ui-stat" class:tj-l={jl('hosts')} class:tj-r={jr('hosts')} style="grid-column: span {spanOf('hosts')}" data-id="hosts" data-n={tiles.indexOf('hosts')} data-handle={onSort ? '' : null}>
+            {@render joinBtn('hosts')}
             <span class="ui-stat-label">Hosts</span>
             <span class="ui-stat-value">{list.length}</span>
             <span class="ui-stat-sub">{live.length} online · {list.length - live.length} offline</span>
         </div>
-        {/if}
-        {#if tiles.includes('cpu')}
-        <div class="ui-stat" style="grid-column: span {spanOf('cpu')}">
+        {:else if t === 'cpu'}
+        <div class="ui-stat" class:tj-l={jl('cpu')} class:tj-r={jr('cpu')} style="grid-column: span {spanOf('cpu')}" data-id="cpu" data-n={tiles.indexOf('cpu')} data-handle={onSort ? '' : null}>
+            {@render joinBtn('cpu')}
             <span class="ui-stat-label">CPU in use</span>
             <span class="ui-stat-value">{pct(usedCores, totCores).toFixed(1)}%<small>{usedCores.toFixed(2)} of {totCores} cores</small></span>
             <div class="ui-segbar" title={cpu.all.map(s => `${s.name}: ${s.cores.toFixed(2)} cores`).join('\n')}>
@@ -173,9 +192,9 @@
             </div>
             <span class="ui-stat-sub ui-legend" bind:clientWidth={cpuW} bind:this={legendEl}>{#each cpu.parts as s}<span><b style="background: var(--metric-cpu); opacity: {s.shade}"></b>{s.name} {s.cores < 0.1 ? "<0.1" : s.cores.toFixed(1)} cores</span>{:else}idle{/each}</span>
         </div>
-        {/if}
-        {#if tiles.includes('mem')}
-        <div class="ui-stat" style="grid-column: span {spanOf('mem')}">
+        {:else if t === 'mem'}
+        <div class="ui-stat" class:tj-l={jl('mem')} class:tj-r={jr('mem')} style="grid-column: span {spanOf('mem')}" data-id="mem" data-n={tiles.indexOf('mem')} data-handle={onSort ? '' : null}>
+            {@render joinBtn('mem')}
             <span class="ui-stat-label">Memory in use</span>
             <span class="ui-stat-value">{fmtGb(usedMem)}<small>of {fmtGb(totMem)}</small></span>
             <div class="ui-segbar" title={memory.all.map(s => `${s.name}: ${fmtGb(s.bytes)}`).join('\n')}>
@@ -183,9 +202,9 @@
             </div>
             <span class="ui-stat-sub ui-legend" bind:clientWidth={memW}>{#each memory.parts as s}<span><b style="background: var(--metric-mem); opacity: {s.shade}"></b>{s.name} {fmtGb(s.bytes)}</span>{:else}—{/each}</span>
         </div>
-        {/if}
-        {#if tiles.includes('disk')}
-        <div class="ui-stat" style="grid-column: span {spanOf('disk')}">
+        {:else if t === 'disk'}
+        <div class="ui-stat" class:tj-l={jl('disk')} class:tj-r={jr('disk')} style="grid-column: span {spanOf('disk')}" data-id="disk" data-n={tiles.indexOf('disk')} data-handle={onSort ? '' : null}>
+            {@render joinBtn('disk')}
             <span class="ui-stat-label">Storage</span>
             <span class="ui-stat-value">{fmtDisk(usedDisk)}<small>of {fmtDisk(totDisk)}</small></span>
             <div class="ui-segbar" title={storage.all.map(x => `${x.name}: ${fmtDisk(x.bytes)} used`).join('\n')}>
@@ -194,6 +213,7 @@
             <span class="ui-stat-sub ui-legend" bind:clientWidth={diskW}>{#each storage.parts as x}<span><b style="background: var(--text-secondary); opacity: {x.shade}"></b>{x.name} {fmtDisk(x.bytes)}</span>{/each}</span>
         </div>
         {/if}
+        {/each}
     </div>
     {/if}
     {/if}
@@ -218,7 +238,7 @@
     {#if embedded && !cards}
     {:else if view === 'grid' || embedded}
         <div class="ui-cardgrid">
-            {#each shown.filter(h => !hiddenIds.includes(h.id)) as h (h.id)}
+            {#each only ? only.map(id => list.find(h => h.id === id)).filter(Boolean) : shown.filter(h => !hiddenIds.includes(h.id)) as h (h.id)}
                 <ResourceCard name={h.name} tag={h.tag} sub={h.sub} icon={h.icon} on={h.online} off={!h.online} on:open={() => go(href.host(h.id))}
                     meters={[
                         { k: 'CPU', p: h.cpu ?? 0, color: 'var(--metric-cpu)', v: h.cpu != null ? h.cpu.toFixed(1) + '%' : '—', of: h.cores ? `of ${h.cores} cores` : '' },
@@ -241,5 +261,8 @@
     .emb { display: flex; flex-direction: column; gap: 16px; }
     /* the columns and spans come from the script (tile layout); phones only tighten the gap */
     .ui-summary.cluster > * { order: 0; }
-    @media (max-width: 760px) { .ui-summary.cluster { gap: 8px; } }
+    /* Customize: the tiles themselves can be dragged (the section around them can't be clicked into) */
+    .tsort { pointer-events: auto; }
+    .cluster { --g: 12px; gap: var(--g); }
+    @media (max-width: 760px) { .cluster { --g: 8px; } }
 </style>
