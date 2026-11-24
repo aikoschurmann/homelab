@@ -59,7 +59,8 @@
         for (const w of ws) if (w.length > 1) h = h.replace(new RegExp(`(${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})(?![^<]*>)`, 'gi'), '<mark>$1</mark>');
         return h;
     }
-    const pathHtml = (path, ws) => mark(path, ws).replace(/\{(\w+)\}/g, '<span class="pp">{$1}</span>');
+    // (a break opportunity after each "/", so a long path wraps between its parts, not mid-word)
+    const pathHtml = (path, ws) => mark(path, ws).replace(/\{(\w+)\}/g, '<span class="pp">{$1}</span>').replace(/(?<!<)\//g, '/<wbr>');
 
     function onKey(e) {
         if (e.key === '/' && !endpoint && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') { e.preventDefault(); searchEl?.focus(); }
@@ -339,7 +340,7 @@
     .epn { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .path { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: var(--accent); }
     .epn small { font-size: 12px; color: var(--text-secondary); white-space: normal; }
-    .epn .path { overflow-wrap: anywhere; white-space: normal; }
+    .epn .path { overflow-wrap: break-word; white-space: normal; }
     .bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 18px; }
     .bars i { width: 4px; border-radius: 1px; background: var(--metric-cpu); opacity: 0.55; }
     .bars i.bad { background: var(--red); opacity: 1; }
@@ -357,7 +358,7 @@
     .warn { display: inline-flex; align-items: center; gap: 6px; color: var(--amber); }
     .resp .body { margin: 0; border-top: 1px solid var(--border); padding: 14px 20px; min-height: 240px; max-height: 620px; overflow: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-primary); background: var(--highlight-3); border-radius: 0 0 var(--radius-card, 8px) var(--radius-card, 8px); }
     @media (max-width: 1100px) { .summary { grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 640px) { .epn .path { overflow-wrap: anywhere; white-space: normal; } .ep-title .path { font-size: 15px; overflow-wrap: anywhere; } }
+    @media (max-width: 640px) { .epn .path { overflow-wrap: break-word; white-space: normal; } .ep-title .path { font-size: 15px; overflow-wrap: anywhere; } }
     /* phone: cards inset 14px, so this lines up with the card's header */
     @media (max-width: 768px) { .reqbar, .resp .body { padding-left: 14px; padding-right: 14px; } }
 </style>
