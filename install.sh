@@ -31,7 +31,15 @@ for c in ${PYTHON:-} python3.14 python3.13 python3.12 python3.11 python3.10 pyth
     command -v "$c" >/dev/null && "$c" -c 'import sys; sys.exit(sys.version_info < (3, 10))' 2>/dev/null && { PY=$c; break; }
 done
 [ -n "$PY" ] || { echo "Needs Python 3.10 or newer (set PYTHON=/path/to/python3)" >&2; exit 1; }
-need npm "Node.js 20 or newer"
+# Debian/Ubuntu split venv out of python3
+"$PY" -c 'import venv, ensurepip' 2>/dev/null || [ -x server/venv/bin/python ] || {
+    echo "$PY can't create virtual environments. On Debian/Ubuntu: sudo apt install python3-venv" >&2; exit 1; }
+need node "Node.js 20 or newer"
+need npm "Node.js 20 or newer, with npm"
+NODE_MAJOR=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)
+[ "$NODE_MAJOR" -ge 20 ] || {
+    echo "Needs Node.js 20 or newer (found $(node --version 2>/dev/null)). Debian 12's apt has 18: use NodeSource or nvm." >&2; exit 1; }
+mkdir -p "$HOMELAB_HOME/logs"; chmod 700 "$HOMELAB_HOME"
 
 say "Python environment (server/venv)"
 # Homebrew's Python can be built against a newer expat than macOS ships; point it at brew's
@@ -46,9 +54,12 @@ server/venv/bin/python -m pip install -q --upgrade pip
 server/venv/bin/python -m pip install -q -r server/requirements.txt
 
 say "Web app (web/ -> server/static)"
-(cd web && { [ -f package-lock.json ] && npm ci --no-audit --no-fund --loglevel=error || npm install --no-audit --no-fund --loglevel=error; } && npm run -s build)
-
-mkdir -p "$HOMELAB_HOME/logs"; chmod 700 "$HOMELAB_HOME"
+# the build's warnings go to a log; it's shown only when the build fails
+BUILD_LOG=$HOMELAB_HOME/logs/install-build.log
+if ! (cd web && { [ -f package-lock.json ] && npm ci --no-audit --no-fund --loglevel=error || npm install --no-audit --no-fund --loglevel=error; } && npm run -s build) > "$BUILD_LOG" 2>&1; then
+    tail -30 "$BUILD_LOG" >&2
+    echo "The web build failed (full log: $BUILD_LOG)" >&2; exit 1
+fi
 # older installs logged backup runs next to the archives; keep that history
 for f in backup.out backup.err; do
     [ -f "$HOME/Homelab-Backups/$f" ] && [ ! -f "$HOMELAB_HOME/logs/$f" ] && cp "$HOME/Homelab-Backups/$f" "$HOMELAB_HOME/logs/$f"
@@ -147,7 +158,24 @@ EOF
     fi
 fi
 
+# a service that started: wait until it answers, or say why it didn't
+if [ "$SERVICE" = 1 ] && { [ "$(uname)" = Darwin ] || command -v systemctl >/dev/null; }; then
+    UP=0
+    for _ in $(seq 1 30); do
+        server/venv/bin/python -c "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:$PORT_NOW/api/server', timeout=2)" 2>/dev/null && { UP=1; break; }
+        sleep 1
+    done
+    if [ "$UP" = 0 ]; then
+        echo "The dashboard didn't answer on port $PORT_NOW after 30 s. Last lines of its log:" >&2
+        tail -20 "$HOMELAB_HOME/logs/dashboard.err" 2>/dev/null >&2
+        exit 1
+    fi
+fi
+
 say "Done"
 echo "    Open http://localhost:$PORT_NOW (first visit: set up this server)"
+if [ "$(uname)" != Darwin ]; then
+    echo "    From other devices: over Tailscale, or ssh -L $PORT_NOW:localhost:$PORT_NOW $(id -un)@$(hostname)"
+fi
 echo "    State:  $HOMELAB_HOME"
 echo "    Update: git pull && ./install.sh"

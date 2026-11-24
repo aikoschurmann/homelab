@@ -25,7 +25,8 @@ cd ~/homelab && ./install.sh
 `install.sh` creates a Python venv, builds the web app and installs a service: a launchd
 agent on macOS, or a systemd user service on Linux. Then open <http://localhost:5050>.
 
-You need **Python 3.10+** and **Node 20+**. Pages light up for the tools you have installed:
+You need **Python 3.10+** (with `venv`: `python3-venv` on Debian/Ubuntu), **Node 20+** and **bash**
+(Alpine: `apk add bash`). Debian 12's own Node is 18; get 20+ from NodeSource or nvm. Pages light up for the tools you have installed:
 OrbStack, Tailscale, cloudflared, Docker, tmux.
 
 ### First run
