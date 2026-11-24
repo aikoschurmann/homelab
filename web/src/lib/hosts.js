@@ -13,11 +13,51 @@ export async function fetchHosts() {
     try {
         const j = await fetch('/api/hosts').then(r => r.json());
         if (j.status === 'success') {
-            hosts.set(withVms(j.data.hosts, get(hostVms)));
+            hosts.set([...withVms(j.data.hosts, get(hostVms)), ...mockHosts()]);
             if (j.data.arrakis?.model) arrakisModel.set(j.data.arrakis.model);
             for (const h of j.data.hosts) if (orbManaged(h) && hostVmsStale(h.id)) fetchHostVms(h.id);
         }
     } catch (e) {}
+}
+
+// ---- mock hosts, for trying layouts with a bigger cluster ----------------------------------
+// Only in this browser (localStorage 'mock_hosts' = how many), never sent to the server, so
+// they raise no alerts and nothing acts on them. ⌘K "Add 10 mock hosts" / "Remove mock hosts".
+const MOCKS = [
+    ['caladan', 'Ubuntu 24.04.1 LTS', 'x86_64', 'Intel NUC', 8, 32],
+    ['ix-nas', 'Debian GNU/Linux 12 (bookworm)', 'x86_64', 'Synology DS920+', 4, 8],
+    ['kaitain', 'macOS 15.1', 'arm64', 'MacBook Pro', 12, 36],
+    ['salusa', 'Fedora Linux 41', 'x86_64', 'Custom PC', 16, 64],
+    ['tleilax-pi', 'Debian GNU/Linux 13 (trixie)', 'aarch64', 'Raspberry Pi 5 Model B', 4, 8],
+    ['richese', 'Ubuntu 22.04.5 LTS', 'x86_64', 'Dell OptiPlex 7090', 8, 16],
+    ['chusuk', 'Arch Linux', 'x86_64', 'ThinkPad X1', 8, 16],
+    ['ecaz', 'macOS 14.6', 'arm64', 'Mac mini', 8, 16],
+    ['lankiveil', 'Debian GNU/Linux 12 (bookworm)', 'aarch64', 'Raspberry Pi 4 Model B', 4, 4],
+    ['poritrin', 'Ubuntu 24.04.1 LTS', 'x86_64', 'HP ProDesk', 6, 16],
+];
+export const mockCount = () => { try { return Math.min(MOCKS.length, +localStorage.getItem('mock_hosts') || 0); } catch (e) { return 0; } };
+export function setMockHosts(n) {
+    try { n ? localStorage.setItem('mock_hosts', String(n)) : localStorage.removeItem('mock_hosts'); } catch (e) {}
+    fetchHosts();
+}
+function mockHosts() {
+    const now = Date.now() / 1000, G = 2 ** 30;
+    // a steady base per host, with a little wobble on every refresh so the bars move
+    const wob = (i, k, base, spread) => Math.max(0.5, base + Math.sin(now / 7 + i * 3 + k) * spread);
+    return MOCKS.slice(0, mockCount()).map(([name, os, arch, model, cores, mem], i) => {
+        // two offline, one that never reported
+        const online = i !== 3 && i !== 8, never = i === 9;
+        return {
+            id: 'mock-' + name, name, online: online && !never, mock: true, added: now - 86400 * (i + 3),
+            last_seen: never ? null : online ? now : now - 3600 * (i + 2), caps: {}, agent_latest: 18, rpc: false,
+            report: never ? null : {
+                agent: '18', os, arch, model, hostname: name, cores, ip: `100.64.0.${10 + i}`, at: now,
+                cpu_pct: wob(i, 0, 8 + (i * 7) % 45, 6), mem_total: mem * G, mem_used: Math.min(mem, wob(i, 1, mem * (0.25 + (i % 5) * 0.12), mem * 0.03)) * G,
+                disk_total: (256 + (i % 4) * 768) * 1e9, disk_used: (256 + (i % 4) * 768) * 1e9 * (0.2 + (i % 6) * 0.13),
+                containers: Array.from({ length: (i * 3) % 7 }, (_, k) => ({ name: `svc-${k}`, status: 'running' })), apps: null, uptime_secs: 86400 * (i + 1),
+            },
+        };
+    });
 }
 
 // the dashboard manages this host's OrbStack (switched on, agent 6 connected)

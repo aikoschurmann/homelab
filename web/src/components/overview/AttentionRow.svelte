@@ -9,6 +9,8 @@
     export let pendingUpdates = 0;
     export let updTargets = [];
     export let backup = null;          // /api/backups/details
+    export let hide = [];              // parts left out under Customize: 'updates', 'apps', 'backups'
+    $: parts = ['updates', 'apps', 'backups'].filter(x => !hide.includes(x));
 
     let apps = null, runs = null;
     async function fetchApps() {
@@ -29,7 +31,12 @@
     const inT = (t) => { const s = Math.max(0, t - now / 1000); return s < 3600 ? `in ${Math.round(s / 60)} min` : `in ${Math.round(s / 3600)} h`; };
 
     // updates: one part per computer, most first
-    $: updSegs = [...updTargets].sort((a, b) => b.packages.length - a.packages.length).map((t, i) => ({ name: t.name, n: t.packages.length, shade: SHADES[i % SHADES.length] }));
+    // past three computers the rest share one "N others" part, like the cluster tiles
+    $: updAll = [...updTargets].sort((a, b) => b.packages.length - a.packages.length).map(t => ({ name: t.name, n: t.packages.length }));
+    $: updSegs = [
+        ...(updAll.length > 4 ? updAll.slice(0, 3) : updAll).map((x, i) => ({ ...x, shade: SHADES[i] })),
+        ...(updAll.length > 4 ? [{ name: `${updAll.length - 3} others`, n: updAll.slice(3).reduce((a, x) => a + x.n, 0), shade: 0.25 }] : []),
+    ];
 
     // apps: fine, newer image, not fully running
     $: projects = apps?.projects || [];
@@ -62,26 +69,39 @@
     $: stale = backup?.last_success && now / 1000 - backup.last_success > 2 * 86400;
 </script>
 
-<section class="ui-card att">
+{#if parts.length}
+<section class="ui-card att" style="grid-template-columns: repeat({parts.length}, minmax(0, 1fr))">
+    {#if parts.includes('updates')}
     <a class="cell" href="#updates">
-        <span class="ui-stat-label">Package updates</span>
-        <span class="ui-stat-value">{pendingUpdates}<small>{pendingUpdates ? `on ${updSegs.length} ${updSegs.length === 1 ? 'computer' : 'computers'}` : 'all up to date'}</small></span>
-        <div class="ui-segbar">{#each updSegs as s}<i style="width: {pct(s.n, pendingUpdates)}%; background: var(--metric-net); opacity: {s.shade}"></i>{/each}</div>
-        <span class="ui-stat-sub ui-legend">{#each updSegs as s}<span><b style="background: var(--metric-net); opacity: {s.shade}"></b>{s.name} {s.n}</span>{:else}nothing to install{/each}</span>
+        <span class="ui-stat-label"><span class="lg">Package updates</span><span class="sm">Updates</span></span>
+        <span class="ui-stat-value">{pendingUpdates}<small>{pendingUpdates ? `on ${updAll.length} ${updAll.length === 1 ? 'computer' : 'computers'}` : 'all up to date'}</small></span>
+        <div class="ui-segbar wide" title={updAll.map(x => `${x.name}: ${x.n}`).join('\n')}>{#each updSegs as s}<i style="width: {pct(s.n, pendingUpdates)}%; background: var(--metric-net); opacity: {s.shade}"></i>{/each}</div>
+        <span class="ui-stat-sub ph">{pendingUpdates ? `${updAll.length} ${updAll.length === 1 ? 'computer' : 'computers'}` : 'up to date'}</span>
+        <span class="ui-stat-sub short">{!pendingUpdates ? 'nothing to install' : updAll.length === 1 ? `all on ${updAll[0].name}` : `most on ${updAll[0].name} (${updAll[0].n})`}</span>
+        <span class="ui-stat-sub ui-legend wide">{#each updSegs as s}<span><b style="background: var(--metric-net); opacity: {s.shade}"></b>{s.name} {s.n}</span>{:else}nothing to install{/each}</span>
     </a>
+    {/if}
+    {#if parts.includes('apps')}
     <a class="cell" href="#apps/installed">
         <span class="ui-stat-label">Apps</span>
         <span class="ui-stat-value">{apps ? projects.length : '—'}<small>{apps ? (appUpd.length || appDown.length ? `${appUpd.length + appDown.length} need a look` : 'all fine') : ''}</small></span>
-        <div class="ui-segbar">{#each appSegs as s}<i style="width: {pct(s.n, projects.length)}%; background: {s.bad ? 'var(--red)' : 'var(--metric-disk)'}; opacity: {s.bad ? 1 : s.shade}"></i>{/each}</div>
-        <span class="ui-stat-sub ui-legend">{#if !apps}Looking…{:else}{#each appSegs as s}<span class:bad={s.bad}><b style="background: {s.bad ? 'var(--red)' : 'var(--metric-disk)'}; opacity: {s.bad ? 1 : s.shade}"></b>{s.n} {s.name}</span>{:else}no Compose apps yet{/each}{/if}</span>
+        <div class="ui-segbar wide">{#each appSegs as s}<i style="width: {pct(s.n, projects.length)}%; background: {s.bad ? 'var(--red)' : 'var(--metric-disk)'}; opacity: {s.bad ? 1 : s.shade}"></i>{/each}</div>
+        <span class="ui-stat-sub ph" class:bad={appDown.length}>{!apps ? '…' : appDown.length ? `${appDown.length} not running` : appUpd.length ? `${appUpd.length} to update` : 'all fine'}</span>
+        <span class="ui-stat-sub short" class:bad={appDown.length}>{!apps ? 'Looking…' : appDown.length ? `${appDown.map(p => p.project).join(', ')} not fully running` : appUpd.length ? `${appUpd.map(p => p.project).join(', ')}: newer image` : 'running and up to date'}</span>
+        <span class="ui-stat-sub ui-legend wide">{#if !apps}Looking…{:else}{#each appSegs as s}<span class:bad={s.bad}><b style="background: {s.bad ? 'var(--red)' : 'var(--metric-disk)'}; opacity: {s.bad ? 1 : s.shade}"></b>{s.n} {s.name}</span>{:else}no Compose apps yet{/each}{/if}</span>
     </a>
+    {/if}
+    {#if parts.includes('backups')}
     <a class="cell" href="#backups/runs">
-        <span class="ui-stat-label">Backups</span>
+        <span class="ui-stat-label"><span class="lg">Backups</span><span class="sm">Backup</span></span>
         <span class="ui-stat-value" class:bad={stale}>{backup?.last_success ? ago(backup.last_success) : '—'}<small>{backup?.running ? 'running now' : backup?.next_run ? `next ${inT(backup.next_run)}` : ''}</small></span>
-        <div class="strip" aria-label="Backups over the last {DAYS} days">{#each days as d (d.key)}<i class={d.state} title="{d.label}: {d.state === 'ok' ? 'backed up' : d.state === 'bad' ? 'failed' : d.state === 'other' ? 'ran, unfinished' : 'no backup'}"></i>{/each}</div>
-        <span class="ui-stat-sub">{runs ? `${okDays} of the last ${DAYS} days` : 'Looking…'}</span>
+        <div class="strip wide" aria-label="Backups over the last {DAYS} days">{#each days as d (d.key)}<i class={d.state} title="{d.label}: {d.state === 'ok' ? 'backed up' : d.state === 'bad' ? 'failed' : d.state === 'other' ? 'ran, unfinished' : 'no backup'}"></i>{/each}</div>
+        <span class="ui-stat-sub ph">{backup?.running ? 'running now' : backup?.next_run ? `next ${inT(backup.next_run)}` : '—'}</span>
+        <span class="ui-stat-sub sub-b">{runs ? `${okDays} of the last ${DAYS} days` : 'Looking…'}</span>
     </a>
+    {/if}
 </section>
+{/if}
 
 <style>
     /* one card in three parts, so it doesn't read as more tiles beside the cluster's */
@@ -97,10 +117,20 @@
     .strip i.ok { background: var(--accent); }
     .strip i.other { background: var(--accent); opacity: 0.4; }
     .strip i.bad { background: var(--red); }
-    /* phone: stacked, divided by the same hairline */
+    .short { display: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* narrower: no bars, just the figure and one short line, so it stays one compact row */
+    @media (max-width: 1150px) {
+        .wide { display: none !important; }
+        .short { display: block; }
+        .cell { gap: 3px; padding: 12px 16px; }
+    }
+    .sm, .ph { display: none; }
+    /* phone: the same three side by side, smaller: label, figure, one grey line */
     @media (max-width: 760px) {
-        .att { grid-template-columns: minmax(0, 1fr); }
-        .cell { padding: 12px 14px; }
-        .cell + .cell { border-left: none; border-top: 1px solid var(--border); }
+        .cell { padding: 12px 12px; gap: 2px; }
+        .lg, .short, .sub-b, .cell .ui-stat-value small { display: none; }
+        .sm { display: inline; }
+        .ph { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .cell .ui-stat-value { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     }
 </style>

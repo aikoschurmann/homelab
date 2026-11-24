@@ -3,7 +3,7 @@
     import { onMount, tick, createEventDispatcher } from 'svelte';
     import { Search, Activity, Boxes, Box, Network, Database, Archive, Terminal, Eye, Settings, Plus, RotateCw, PackageCheck, HardDriveUpload, Gauge, RefreshCw, Server, Cpu, Monitor, Palette, Cloud, HeartPulse, ScrollText, Store } from 'lucide-svelte';
     import { machines } from '../lib/stores.js';
-    import { hosts } from '../lib/hosts.js';
+    import { hosts, mockCount, setMockHosts } from '../lib/hosts.js';
     import { services } from '../lib/services.js';
     import { tailnet } from '../lib/tailscale.js';
     import { settingsIndex, openSetting } from '../lib/settingsIndex.js';
@@ -36,7 +36,8 @@
         applyTheme(t.id, true);
         toast(`Theme: ${t.label}`);
     }
-    const ACTIONS = [
+    let mockOn = mockCount();
+    $: ACTIONS = [
         { id: 'new-session', title: 'New terminal session', hint: '⌘T', icon: Plus, run: newSession },
         { id: 'new-machine', title: 'Create machine', icon: Plus, run: () => go('#infra/orbstack/new') },
         { id: 'add-host', title: 'Add host', icon: Plus, run: () => go('#infra/new') },
@@ -47,6 +48,9 @@
         { id: 'reboot-host', title: 'Reboot the Mac', icon: RotateCw, danger: true, run: async () => { const r = await post('/api/host/command/reboot'); toast(r.status === 'success' ? 'Mac reboot started' : 'Reboot failed: ' + (r.message || r.stderr || 'unknown error')); } },
         { id: 'reboot-vm', title: 'Reboot the dashboard VM', icon: RotateCw, danger: true, run: () => { post('/api/vm/command/reboot'); toast('VM reboot started'); } },
         { id: 'update', title: 'Update packages on the Mac and VM', icon: PackageCheck, run: () => go('#updates') },
+        // fake hosts in this browser only, for trying layouts
+        mockOn ? { id: 'mock-off', title: 'Remove mock hosts', icon: Server, run: () => { setMockHosts(0); mockOn = 0; toast('Mock hosts removed'); } }
+                    : { id: 'mock-on', title: 'Add 10 mock hosts', icon: Server, run: () => { setMockHosts(10); mockOn = 10; toast('10 mock hosts added in this browser'); } },
     ];
 
     $: items = [

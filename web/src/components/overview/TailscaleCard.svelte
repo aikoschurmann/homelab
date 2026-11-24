@@ -9,6 +9,8 @@
     export let peers = [];
 
     // the Tailscale page's own data when loaded, so both count the same devices
+    // measured, so it lays out by its own width (half width on the Overview, or a phone)
+    let cw = 1000;
     $: tsDevices = $tailnet?.devices;
     $: peersTotal = tsDevices ? tsDevices.length : peers.length;
     $: tsOnline = (tsDevices || []).filter(d => d.online);
@@ -29,7 +31,7 @@
     const total = (d) => d.rx_bytes + d.tx_bytes;
 </script>
 
-<section class="ui-card ts-card" id="sec-tailscale">
+<section class="ui-card ts-card" class:narrow={cw < 760} id="sec-tailscale" bind:clientWidth={cw}>
     <div class="ui-card-head">
         <div>
             <h2 class="ui-card-title">Tailscale <button type="button" class="info" use:infoPop aria-label="About connections"><Info size={13} /><span class="info-pop" role="tooltip"><b>Direct</b>: {SN} and the device talk peer to peer, the fastest path.<br /><b>Relayed</b>: traffic goes through a Tailscale relay server because no direct path was found. It works, just slower.<br /><b>Traffic</b>: bytes between {SN} and each device, counted by Tailscale since it last started on {SN}. It goes back to zero when Tailscale restarts.</span></button></h2>
@@ -112,6 +114,12 @@
     .info-pop { position: absolute; left: calc(-10px + var(--dx, 0px)); max-width: calc(100vw - 24px); top: calc(100% + 8px); width: 280px; text-align: left; padding: 8px 10px; border-radius: 6px; background: var(--text-primary); color: var(--surface); font-size: 12px; font-weight: 400; line-height: 1.45; letter-spacing: 0; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); display: none; z-index: 5; }
     .info:hover .info-pop, .info:focus-visible .info-pop, :global(.info.open) .info-pop { display: block; animation: info-in .15s ease; }
     @keyframes info-in { from { opacity: 0; transform: translateY(-4px); } }
+
+    /* narrow card (half width or phone): one device column, traffic on its own line */
+    .narrow .io { flex-basis: 100%; margin-left: 0; padding-left: 0; border-left: none !important; }
+    .narrow .d-cols { grid-template-columns: 1fr; }
+    .narrow .d-col + .d-col { border-left: none; border-top: 1px solid var(--border); }
+    .narrow .d-hint { display: none; }
 
     /* the traffic group drops to its own line before things get tight */
     @media (max-width: 1100px) {

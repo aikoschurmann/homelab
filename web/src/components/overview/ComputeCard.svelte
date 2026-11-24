@@ -1,4 +1,6 @@
 <script>
+    // measured, so a half-width card gets the stacked layout too
+    let cw = 1200;
     // The Overview's compute card: each pool on one row: how much of it is working, the last
     // 10 minutes, its throughput, and what is running on it now.
     import { onMount } from 'svelte';
@@ -23,7 +25,7 @@
     $: coresAll = running.reduce((a, p) => a + poolNow(p, readings[p.name]).cores, 0);
 </script>
 
-<section class="ui-card" id="sec-compute">
+<section class="ui-card" class:narrow={cw < 760} id="sec-compute" bind:clientWidth={cw}>
     <div class="ui-card-head">
         <div><h2 class="ui-card-title">Compute</h2>
             <p class="ui-card-desc">{#if !$pools}Loading…{:else if running.length}{busyAll.toFixed(1)} of {coresAll} cores busy across {running.length === 1 ? 'one running pool' : `${running.length} running pools`}.{:else if $pools.length}No pool is running.{:else}Pools of nodes that work as one machine.{/if}</p></div>
@@ -57,7 +59,7 @@
 <style>
     .more { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap; }
     .rows { border-top: 1px solid var(--border); }
-    .row { display: grid; grid-template-columns: minmax(150px, 1.1fr) 130px minmax(120px, 1.5fr) 80px minmax(150px, 1.3fr) 16px; gap: 0 18px; align-items: center; width: 100%; padding: 12px 20px; border-bottom: 1px solid var(--border); text-align: left; color: var(--text-primary); font-size: 13px; cursor: pointer; box-sizing: border-box; }
+    .row { display: grid; grid-template-columns: minmax(0, 1.1fr) 130px minmax(0, 1.5fr) 80px minmax(0, 1.3fr) 16px; gap: 0 18px; align-items: center; width: 100%; padding: 12px 20px; border-bottom: 1px solid var(--border); text-align: left; color: var(--text-primary); font-size: 13px; cursor: pointer; box-sizing: border-box; }
     .row:last-child { border-bottom: none; border-radius: 0 0 var(--radius-card, 8px) var(--radius-card, 8px); }
     .row:not(.head):hover { background: var(--highlight-3); }
     .row:hover :global(.go) { color: var(--accent); }
@@ -76,6 +78,13 @@
     .job .ui-mono { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; }
     .empty { display: flex; align-items: center; gap: 8px; padding: 16px 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-secondary); }
     .empty:hover { color: var(--accent); }
+    .nm, .nm-t, .strip { min-width: 0; }
+    .nm-t b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* medium widths (sidebar open): the per-second figure goes, so the strip and job keep room */
+    @media (min-width: 761px) and (max-width: 1200px) {
+        .row { grid-template-columns: minmax(0, 1fr) 120px minmax(0, 1.4fr) minmax(0, 1.2fr) 16px; gap: 0 14px; }
+        .row > :nth-child(4) { display: none; }
+    }
     /* phone: no column headers; each pool is a small block: name, the two figures, the
        strip across, then what's running */
     @media (max-width: 760px) {
@@ -89,4 +98,15 @@
         .job:empty { display: none; }
         :global(.row .go) { grid-area: go; }
     }
+    /* the same stacked rows when the card itself is narrow (half width) */
+    .narrow .row.head { display: none; }
+    .narrow .row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 16px; grid-template-areas: "nm nm go" "fig rate rate" "strip strip strip" "job job job"; gap: 10px 12px; padding: 14px 20px; }
+    .narrow .row > :nth-child(4) { display: flex; }
+    .narrow .nm { grid-area: nm; }
+    .narrow .fig { grid-area: fig; }
+    .narrow .rate { grid-area: rate; justify-self: end; }
+    .narrow .strip { grid-area: strip; }
+    .narrow .job { grid-area: job; }
+    .narrow .job:empty { display: none; }
+    .narrow :global(.row .go) { grid-area: go; }
 </style>

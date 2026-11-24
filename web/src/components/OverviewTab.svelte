@@ -2,8 +2,12 @@
     import { SN } from '../lib/server.js';
     import { infoPop } from '../lib/infoPop.js';
     import { onMount } from 'svelte';
-    import { Database, Terminal, ArrowRight, Archive, SlidersHorizontal, Check, Info } from 'lucide-svelte';
-    import { hiddenWidgets, OVERVIEW_WIDGETS, toggleWidget, showAllWidgets } from '../lib/widgets.js';
+    import { Database, Terminal, ArrowRight, Archive, SlidersHorizontal, Check, Info, PackageCheck, Store, ScrollText, Network, Cloud, ShieldCheck, Eye } from 'lucide-svelte';
+    import { layout, hiddenWidgets, fetchLayout, measureSection } from '../lib/widgets.js';
+    import CustomizeMenu from './overview/CustomizeMenu.svelte';
+    // #overview/customize shows the layout editor in place of the page
+    let customizing = typeof location !== 'undefined' && location.hash === '#overview/customize';
+    onMount(() => { const f = () => customizing = location.hash === '#overview/customize'; window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f); });
     import { endpoints, fetchEndpoints, machines, fetchMachines, machineUsage, fetchMachineUsage, gbFromMib, visible } from '../lib/stores.js';
     import { services, fetchServices, fmtMb } from '../lib/services.js';
     import { fmtBytes, imageLabel } from '../lib/machines.js';
@@ -15,6 +19,11 @@
     import { fetchTailnet } from '../lib/tailscale.js';
     import TailscaleCard from './overview/TailscaleCard.svelte';
     import ComputeCard from './overview/ComputeCard.svelte';
+    import UptimeCard from './overview/UptimeCard.svelte';
+    import PiholeCard from './overview/PiholeCard.svelte';
+    import MachinesCard from './overview/MachinesCard.svelte';
+    import { tailnet } from '../lib/tailscale.js';
+    import { cloudflare, isActive } from '../lib/cloudflare.js';
     import LiveChart from './ui/LiveChart.svelte';
     import AttentionRow from './overview/AttentionRow.svelte';
 
@@ -23,9 +32,6 @@
 
     // reactive, so ticking a card in Customize redraws the page
     $: show = (id) => !$hiddenWidgets.has(id);
-    $: hiddenCount = OVERVIEW_WIDGETS.filter(w => $hiddenWidgets.has(w.id)).length;
-    let customizeOpen = false, customizeEl;
-    const onDocClick = (e) => { if (customizeOpen && customizeEl && !customizeEl.contains(e.target)) customizeOpen = false; };
 
     // ---- host -------------------------------------------------------------------------
     $: hd = stats?.host?.details || {};
@@ -205,7 +211,7 @@
     const LAT_MAX = 112, LAT_AXIS = 24, R = 5, DECADES = [0.1, 1, 10, 100, 1000];
     // anything faster than 0.1 ms sits on the first tick, so that tick says so
     const tickLabel = (d) => d >= 1000 ? '1 s' : d === 0.1 ? '≤0.1 ms' : `${d} ms`;
-    let latW = 600, hoverPath = null;
+    let latW = 600, hoverPath = null, latCardW = 1200;
     $: lx = (ms) => 12 + (Math.log10(Math.min(1000, Math.max(0.1, ms))) + 1) / 4 * (latW - 24);
     $: swarm = (() => {
         const mid = (LAT_MAX - LAT_AXIS) / 2, step = 2 * R + 3, placed = [];
@@ -237,10 +243,37 @@
     }
     const agoTs = (t) => { const s = Math.max(0, now / 1000 - t); return s < 3600 ? `${Math.round(s / 60)}m ago` : s < 86400 ? `${Math.round(s / 3600)}h ago` : `${Math.round(s / 86400)}d ago`; };
     const inTs = (t) => { const s = Math.max(0, t - now / 1000); return s < 3600 ? `in ${Math.round(s / 60)}m` : s < 86400 ? `in ${Math.round(s / 3600)}h` : `in ${Math.round(s / 86400)}d`; };
+    // narrower than two columns: every section full width, in order
+    let vw = 1440, totRows = 1;
+    $: narrow = vw <= 1000;
+    // the shown sections in order, consecutive half-width ones grouped into pairs of columns
+    $: groups = (() => {
+        const out = [];
+        for (const id of $layout.order.filter(show)) {
+            const half = $layout.widths[id] === 'half', last = out.at(-1);
+            if (half && narrow) { out.push({ key: id, half: false, ids: [id] }); continue; }
+            if (half && last?.half) last.ids.push(id);
+            else out.push({ key: id, half, ids: [id] });
+        }
+        return out;
+    })();
+    // the shortcuts picked under Customize: each page with one figure of what it holds
+    $: SC = {
+        databases: { to: '#databases', icon: Database, k: 'Databases', v: String(dbList.length), s: size(dbList.reduce((a, d) => a + (d.size_bytes || 0), 0)) },
+        terminal: { to: '#terminal', icon: Terminal, k: 'Terminal', v: String(sessions.length), s: sessions.length === 1 ? 'tmux session' : 'tmux sessions' },
+        backups: { to: '#backups', icon: Archive, k: 'Backups', v: backup?.last_success ? agoTs(backup.last_success) : '—', s: backup?.next_run ? 'next ' + inTs(backup.next_run) : '' },
+        updates: { to: '#updates', icon: PackageCheck, k: 'Updates', v: String(pendingUpdates), s: pendingUpdates ? `on ${updTargets.length} ${updTargets.length === 1 ? 'computer' : 'computers'}` : 'all up to date' },
+        apps: { to: '#apps/installed', icon: Store, k: 'Apps', v: '', s: 'installed and catalogue' },
+        logs: { to: '#logs', icon: ScrollText, k: 'Logs', v: '', s: 'search every log' },
+        tailscale: { to: '#tailscale', icon: Network, k: 'Tailscale', v: String(($tailnet?.devices || []).filter(d => d.online && !d.self).length), s: 'devices online' },
+        cloudflare: { to: '#cloudflare', icon: Cloud, k: 'Cloudflare', v: String(($cloudflare?.tunnels || []).filter(isActive).length), s: 'tunnels up' },
+        pihole: { to: '#tools/pihole', icon: ShieldCheck, k: 'Pi-hole', v: '', s: 'queries and blocking' },
+        endpoints: { to: '#endpoints', icon: Eye, k: 'API endpoints', v: String($endpoints.length), s: 'routes' },
+    };
     const fmtMs = (ms) => (ms < 10 ? ms.toFixed(1) : Math.round(ms)) + ' ms';
 
     onMount(() => {
-        fetchHistory(); fetchDatabases(); fetchBackup(); fetchTailnet(); fetchEndpoints(); fetchMachines(); fetchMachineUsage(); fetchServices(); fetchHosts(); fetchDisks();
+        fetchLayout(); fetchHistory(); fetchDatabases(); fetchBackup(); fetchTailnet(); fetchEndpoints(); fetchMachines(); fetchMachineUsage(); fetchServices(); fetchHosts(); fetchDisks();
         const tick = setInterval(() => now = Date.now(), 1000);
         const poll = setInterval(() => {
             if (!visible()) return;
@@ -252,8 +285,10 @@
     });
 </script>
 
-<svelte:window on:click={onDocClick} on:keydown={e => e.key === 'Escape' && (customizeOpen = false)} />
-
+<svelte:window bind:innerWidth={vw} />
+{#if customizing}
+<CustomizeMenu mode="editor" />
+{:else}
 <div class="ui-page">
     <div class="ui-head">
         <div>
@@ -266,67 +301,42 @@
             </div>
         </div>
         <div class="ui-head-actions">
-            <div class="cust" bind:this={customizeEl}>
-                <button class="ui-btn" aria-haspopup="menu" aria-expanded={customizeOpen} on:click={() => customizeOpen = !customizeOpen}>
-                    <SlidersHorizontal size={14} /> Customize{#if hiddenCount}<span class="cust-n">{hiddenCount} hidden</span>{/if}
-                </button>
-                {#if customizeOpen}
-                    <div class="cust-menu pop-menu" role="menu">
-                        <div class="cust-head">Cards on this page</div>
-                        {#each OVERVIEW_WIDGETS as w}
-                            {@const on = show(w.id)}
-                            <button class="cust-item" role="menuitemcheckbox" aria-checked={on} on:click={() => toggleWidget(w.id)}>
-                                <span class="box" class:on>{#if on}<Check size={11} strokeWidth={3} />{/if}</span>{w.label}
-                            </button>
-                        {/each}
-                        {#if hiddenCount}<div class="cust-foot"><button class="ui-link" on:click={showAllWidgets}>Show all</button></div>{/if}
-                    </div>
-                {/if}
-            </div>
+            <CustomizeMenu mode="button" data={{ arrakis: { cpu: live.cpu ?? cpuNow, mem, disk, cores }, pendingUpdates, updTargets, backupAgo: backup?.last_success ? agoTs(backup.last_success) : null, dbCount: dbList.length, sessions: sessions.length, medianMs }} />
         </div>
     </div>
 
-    {#if show('webapps')}<WebAppsCard />{/if}
-
-    {#if show('attention')}<AttentionRow {now} {pendingUpdates} {updTargets} {backup} />{/if}
-
-    {#if show('host')}
-    <!-- the cluster: totals split per host, then one card per host (same as the Infrastructure page) -->
-    <div id="sec-host">
-        <InfraIndex embedded
+    <!-- the sections, in the order and with the cards picked under Customize -->
+    {#snippet section(id)}
+    <div class="msr" use:measureSection={`${id}:${$layout.widths[id] === 'half' && !narrow ? 'half' : 'full'}${id === 'totals' ? ':' + totRows : ''}`}>
+    {#if id === 'webapps'}<WebAppsCard />
+    {:else if id === 'attention'}<AttentionRow {now} {pendingUpdates} {updTargets} {backup} hide={$layout.hidden_tiles} />
+    {:else if id === 'totals'}
+    <!-- the cluster's totals split per host, as on the Infrastructure page -->
+    <div id="sec-totals"><InfraIndex embedded cards={false} bind:rows={totRows} hideTiles={$layout.hidden_tiles} cols={$layout.totals_cols}
             arrakis={{ cpu: live.cpu, mem, disk, cores, os: 'macOS', up: upSince ? (now - upSince) / 1000 : null }}
-            vm={{ running: !!vmEngine, cpu: vmCpu, memGb: vmGb, limitGb: pool ? pool.memory_mib / 1024 : null, up: vmEngine?.uptime_seconds }} />
-    </div>
-    {/if}
-
-    <!-- Tailscale summary beside the other pages' shortcuts -->
-    {#if show('tailscale') || show('shortcuts')}
-    <div class="row ts-row single">
-        {#if show('tailscale')}
-        <TailscaleCard {peers} />
-        {/if}
-
-        {#if show('shortcuts')}
-        <div class="shortcuts" id="sec-databases">
-            <a class="sc" href="#databases">
-                <span class="sc-ic"><Database size={16} /></span>
-                <span class="sc-main"><span class="sc-k">Databases</span><span class="sc-v">{dbList.length} <small><i class="sep">· </i>{size(dbList.reduce((a, d) => a + (d.size_bytes || 0), 0))}</small></span></span>
+            vm={{ running: !!vmEngine, cpu: vmCpu, memGb: vmGb, limitGb: pool ? pool.memory_mib / 1024 : null, up: vmEngine?.uptime_seconds }} /></div>
+    {:else if id === 'host'}
+    <div id="sec-host"><InfraIndex embedded summary={false} hiddenIds={$layout.hidden_hosts}
+            arrakis={{ cpu: live.cpu, mem, disk, cores, os: 'macOS', up: upSince ? (now - upSince) / 1000 : null }}
+            vm={{ running: !!vmEngine, cpu: vmCpu, memGb: vmGb, limitGb: pool ? pool.memory_mib / 1024 : null, up: vmEngine?.uptime_seconds }} /></div>
+    {:else if id === 'tailscale'}<TailscaleCard {peers} />
+    {:else if id === 'shortcuts'}
+    <div class="shortcuts" id="sec-databases" style="--n: {Math.max(1, $layout.shortcuts.length)}">
+        {#each $layout.shortcuts as k (k)}
+            {@const c = SC[k]}
+            <a class="sc" href={c.to}>
+                <span class="sc-ic"><svelte:component this={c.icon} size={16} /></span>
+                <span class="sc-main"><span class="sc-k">{c.k}</span><span class="sc-v">{c.v} <small>{#if c.v && c.s}<i class="sep">· </i>{/if}{c.s}</small></span></span>
                 <ArrowRight size={14} class="sc-go" />
             </a>
-            <a class="sc" href="#terminal" id="sec-terminal">
-                <span class="sc-ic"><Terminal size={16} /></span>
-                <span class="sc-main"><span class="sc-k">Terminal</span><span class="sc-v">{sessions.length} <small>{sessions.length === 1 ? 'tmux session' : 'tmux sessions'}</small></span></span>
-                <ArrowRight size={14} class="sc-go" />
-            </a>
-        </div>
-        {/if}
+        {:else}<div class="ui-card ui-empty">No shortcuts picked. Add some under Customize.</div>{/each}
     </div>
-    {/if}
-
-    {#if show('compute')}<ComputeCard />{/if}
-
-    {#if show('api-latency')}
-    <section class="ui-card" id="sec-api-latency">
+    {:else if id === 'compute'}<ComputeCard />
+    {:else if id === 'uptime'}<UptimeCard />
+    {:else if id === 'pihole'}<PiholeCard />
+    {:else if id === 'machines'}<MachinesCard />
+    {:else if id === 'api-latency'}
+    <section class="ui-card" class:latn={latCardW < 760} id="sec-api-latency" bind:clientWidth={latCardW}>
         <div class="ui-card-head">
             <div><h2 class="ui-card-title">API latency <button type="button" class="info" use:infoPop aria-label="Reads only. Actions such as creating a machine take seconds by design and are left out."><Info size={13} /><span class="info-pop" role="tooltip">Reads only. Actions such as creating a machine take seconds by design and are left out.</span></button></h2><p class="ui-card-desc">How quickly the backend answers this dashboard.</p></div>
             <a class="ui-link more" href="#endpoints">Endpoints <ArrowRight size={13} /></a>
@@ -381,8 +391,25 @@
         {/if}
     </section>
     {/if}
+    </div>
+    {/snippet}
+
+    <!-- full-width sections one per row; a run of half-width ones as two columns that stack
+         independently (first, third… left; second, fourth… right), so a short one leaves no hole -->
+    <div class="secs">
+    {#each groups as g (g.key)}
+        {#if g.half}
+            <div class="pair">
+                {#each [g.ids.filter((_, i) => i % 2 === 0), g.ids.filter((_, i) => i % 2 === 1)] as col}
+                    <div class="col">{#each col as id (id)}{@render section(id)}{/each}</div>
+                {/each}
+            </div>
+        {:else}{@render section(g.ids[0])}{/if}
+    {/each}
+    </div>
 </div>
 
+{/if}
 <style>
     /* usage */
     .mtabs { display: flex; align-items: stretch; border-bottom: 1px solid var(--border); border-top: 1px solid var(--border); }
@@ -411,8 +438,16 @@
     /* tailscale summary */
     .ts-row { grid-template-columns: 2fr 1fr; }
 
+    /* sections: full width, or two half-width ones side by side (one column on narrower screens) */
+    .msr { display: flex; flex-direction: column; min-width: 0; }
+    .secs { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+    .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+    .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+
     /* shortcuts */
-    .shortcuts { display: grid; grid-template-columns: 1fr; gap: 12px; align-content: stretch; }
+    /* as many across as fit (at least 220px each), never more than there are */
+    .shortcuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(220px, calc((100% - 36px) / min(var(--n), 4))), 1fr)); gap: 12px; align-content: start; }
     .ts-row .shortcuts { grid-auto-rows: 1fr; }
     .ts-row.single { grid-template-columns: 1fr; }
     .ts-row.single .shortcuts { grid-template-columns: repeat(2, 1fr); }
@@ -468,18 +503,19 @@
     .lat-chip .p { font-family: 'JetBrains Mono', monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .lat-chip b { font-weight: 600; font-variant-numeric: tabular-nums; flex-shrink: 0; }
     .rk { width: 16px; height: 16px; margin-left: -6px; border-radius: 50%; background: var(--highlight-10); color: var(--text-secondary); font-size: 10.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    /* narrow card (half width): the figure as one line on top, the plot across, the
+       slowest as a short list instead of chips */
+    .latn .lat { grid-template-columns: minmax(0, 1fr); }
+    .latn .lat-hero { flex-direction: row; flex-wrap: wrap; justify-content: flex-start; align-items: baseline; column-gap: 10px; row-gap: 2px; padding: 14px 20px; border-right: none; border-bottom: 1px solid var(--border); }
+    .latn .lat-k { flex-basis: 100%; }
+    .latn .lat-v { font-size: 24px; }
+    .latn .lat-plot { padding: 12px 16px 8px; }
+    .latn .lat-slow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 10px 12px 12px; }
+    .latn .lat-slow-k { padding: 0 8px 4px; }
+    .latn .lat-chip { height: 30px; border: none; border-radius: 6px; padding: 0 8px; }
+    .latn .lat-chip b { margin-left: auto; }
     .lat-chip.on .rk, .lat-chip:hover .rk { background: var(--accent); color: var(--surface); }
 
-    /* customize */
-    .cust { position: relative; }
-    .cust-n { font-size: 12px; font-weight: 400; color: var(--text-secondary); margin-left: 2px; }
-    .cust-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; width: 250px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 8px); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14); }
-    .cust-head { font-size: 12px; font-weight: 600; color: var(--text-secondary); padding: 6px 8px 6px; }
-    .cust-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border-radius: 5px; font-size: 13.5px; color: var(--text-primary); text-align: left; cursor: pointer; }
-    .cust-item:hover { background: var(--highlight-10); }
-    .box { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--surface); }
-    .box.on { background: var(--text-primary); border-color: var(--text-primary); }
-    .cust-foot { border-top: 1px solid var(--border); margin-top: 4px; padding: 8px 8px 4px; font-size: 13px; }
 
     /* three narrow tiles: the detail drops under the figure instead of trailing off */
     @media (min-width: 761px) and (max-width: 1100px) {
@@ -500,7 +536,6 @@
     }
     @media (max-width: 1100px) {
         .ts-row { grid-template-columns: 1fr; }
-        .shortcuts { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 760px) {
         .ui-card-head { flex-wrap: wrap; }
