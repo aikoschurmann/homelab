@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { Search, Loader2, RotateCw } from 'lucide-svelte';
     import { SN } from '../lib/server.js';
+    import MenuSelect from './ui/MenuSelect.svelte';
 
     // One search across every container's logs (all running OrbStack machines) and the Mac
     // apps' log files, newest first. A search starting with / is a pattern (regex).
@@ -39,6 +40,25 @@
     const PROBLEM = /\b(error|errors|err|fatal|panic|exception|traceback|fail|failed|failure|critical|crit|warn|warning|denied|refused|timeout|timed out)\b/i;
     // the time column already says when: drop a timestamp the line starts with
     const STAMP = /^\s*[[(]?\w?\)?\s*\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\s*(?:Z|[+-]\d{2}:?\d{2})?[\])]?\s*(?:-\s*)?/;
+    // The same line again from the same source (a health check every 30 s, say) shows once, the
+    // newest, with how many times it came; dates and times inside the text don't count as different.
+    const TIMEISH = /\d{1,4}[-/](?:\d{1,2}|[A-Za-z]{3})[-/]\d{1,4}(?:[ T:]\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?)?|\b\d{1,2}:\d{2}:\d{2}(?:[.,]\d+)?\b|\s[+-]\d{4}\b|\b\d{10,13}\b/g;
+    let unfolded = new Set();
+    $: data, (unfolded = new Set());
+    $: rows = fold(data?.lines || [], unfolded);
+    function fold(lines, open) {
+        const seen = new Map(), out = [];
+        for (const r of lines) {
+            const k = r.where + '|' + r.source + '|' + r.line.replace(STAMP, '').replace(TIMEISH, '#').trim();
+            const first = seen.get(k);
+            if (first && !open.has(k)) { first.n++; first.from = r.t; continue; }
+            const row = { ...r, k, n: 1, from: r.t };
+            if (!first) seen.set(k, row);
+            out.push(row);
+        }
+        return out;
+    }
+    const unfold = (k) => { unfolded.add(k); unfolded = unfolded; };
     const esc = (s) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     function mark(line) {
         const e = esc(line.replace(STAMP, ''));
@@ -65,11 +85,8 @@
             <button class:on={problems} on:click={() => problems = true}>Problems</button>
         </div>
         <span class="ui-count">{#if data}{data.total > data.lines.length ? `newest ${data.lines.length} of ${data.total}` : `${data.total} ${data.total === 1 ? 'line' : 'lines'}`}{/if}</span>
-        <select class="ui-select src" bind:value={source} aria-label="Where">
-            <option value="">Everywhere</option>
-            <option value="mac">Apps on the Mac</option>
-            {#each sources?.machines || [] as m}<option value={m}>Containers in {m}</option>{/each}
-        </select>
+        <MenuSelect heading="Where" value={source} onChange={(v) => source = v}
+            options={[{ value: '', label: 'Everywhere' }, { value: 'mac', label: 'Apps on the Mac' }, ...(sources?.machines || []).map(m => ({ value: m, label: `Containers in ${m}` }))]} />
     </div>
 
     <section class="ui-card">
@@ -84,11 +101,11 @@
                 <table class="ui-tbl">
                     <thead><tr><th class="shrink tcol">Time</th><th class="shrink c-sm">Source</th><th>Message</th></tr></thead>
                     <tbody>
-                        {#each data.lines as r, i (i)}
+                        {#each rows as r, i (i)}
                             <tr>
                                 <td class="t tcol"><span class="lvl" class:bad={PROBLEM.test(r.line)}></span>{time(r.t)}</td>
                                 <td class="c-sm s" title={r.where === 'mac' ? 'App on the Mac' : `Container in ${r.where}`}>{r.source}</td>
-                                <td class="m"><div class="when"><span class="lvl" class:bad={PROBLEM.test(r.line)}></span>{time(r.t)} · {r.source}</div>{@html mark(r.line)}</td>
+                                <td class="m"><div class="when"><span class="lvl" class:bad={PROBLEM.test(r.line)}></span>{time(r.t)} · {r.source}</div>{@html mark(r.line)}{#if r.n > 1}<button class="rep" on:click={() => unfold(r.k)} title="Show each of the {r.n} lines">×{r.n} since {time(r.from)}</button>{/if}</td>
                             </tr>
                         {/each}
                     </tbody>
@@ -99,7 +116,8 @@
 </div>
 
 <style>
-    .src { width: auto; height: 32px; }
+    .rep { display: block; margin-top: 2px; font-family: 'Inter', sans-serif; font-size: 11.5px; color: var(--text-secondary); cursor: pointer; }
+    .rep:hover { color: var(--text-primary); }
     .scroll { max-height: calc(100vh - 260px); overflow-y: auto; }
     .scroll thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
     .ui-tbl td { padding-top: 8px; padding-bottom: 8px; vertical-align: top; }
@@ -115,7 +133,6 @@
     .when { display: none; }
     /* phone: time and source go on a grey line above the message, which gets the full width */
     @media (max-width: 640px) {
-        .src { width: 100%; }
         .tcol { display: none; }
         .when { display: block; font-family: 'Inter', sans-serif; font-size: 11.5px; color: var(--text-secondary); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .when .lvl:not(.bad) { display: none; }
