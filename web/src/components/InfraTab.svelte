@@ -96,7 +96,7 @@
                         <p class="ui-dim">{added.name}</p>
                     {:else}
                         <form class="name-row" on:submit|preventDefault={submitAdd}>
-                            <input class="ui-input" class:bad={addError} placeholder="e.g. shitty-pc" bind:value={newName} maxlength="41" autofocus />
+                            <input class="ui-input" class:bad={addError} placeholder="e.g. my-laptop" bind:value={newName} maxlength="41" autofocus />
                             <button class="ui-btn primary" disabled={!newName.trim() || adding}>{#if adding}<Loader2 size={14} class="ui-spin" />{/if} Continue</button>
                         </form>
                         {#if addError}<p class="err">{addError}</p>{:else}<p class="ui-hint">How it shows on the dashboard. Its own hostname is fine.</p>{/if}

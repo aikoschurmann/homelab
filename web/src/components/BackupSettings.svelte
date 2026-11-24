@@ -79,7 +79,7 @@
                         <div class="frow"><span class="ui-mono" title={f}>{f}</span><button class="x" aria-label="Remove {f}" title="Stop backing up this folder" on:click={() => set = { ...set, folders: set.folders.filter((_, j) => j !== i) }}><X size={14} /></button></div>
                     {/each}
                     <form class="fadd" on:submit|preventDefault={addFolder}>
-                        <input class="ui-input mono" placeholder="/Users/muadhib/Documents/Projects" bind:value={newFolder} spellcheck="false" />
+                        <input class="ui-input mono" placeholder="~/Documents/Projects" bind:value={newFolder} spellcheck="false" />
                         <button class="ui-btn sm" disabled={!newFolder.trim()}><Plus size={13} /> Add</button>
                     </form>
                 </div>
