@@ -6,6 +6,23 @@ from datetime import datetime
 from app.core.config import VM_NAME, VM_CMD_PREFIX
 from app.core import server_cfg, paths
 
+_lan = {"ip": None, "at": 0.0}
+
+def _lan_ip():
+    """This Mac's LAN address: the one on the default route's interface (cached for a minute)."""
+    import time
+    if time.time() - _lan["at"] < 60:
+        return _lan["ip"]
+    ip = None
+    try:
+        out = subprocess.run(["route", "-n", "get", "default"], capture_output=True, text=True, timeout=5).stdout
+        iface = next((l.split(":", 1)[1].strip() for l in out.splitlines() if "interface:" in l), "en0")
+        ip = subprocess.run(["ipconfig", "getifaddr", iface], capture_output=True, text=True, timeout=5).stdout.strip() or None
+    except Exception:
+        pass
+    _lan.update(ip=ip, at=time.time())
+    return ip
+
 def parse_arrakis_native():
     """
     A fast, shell-less replacement for the bash `arrakis` function.
@@ -17,7 +34,9 @@ def parse_arrakis_native():
     }
     
     # --- HOST DETAILS ---
-    data["host"]["details"]["Local IP"] = "192.168.1.14" # Just hardcoded for brevity, or we can get it
+    lan = _lan_ip()
+    if lan:
+        data["host"]["details"]["Local IP"] = lan
     try:
         data["host"]["details"]["Uptime"] = f"T:{int(psutil.boot_time())}"
         data["host"]["details"]["CPU Usage"] = "0.0%"
