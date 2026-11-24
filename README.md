@@ -34,19 +34,19 @@ running when you close the tab.
 <tr>
 <td width="33%" valign="top">
 
-### 🖥️ One view of everything
+### One view of everything
 Each host's CPU, memory and storage, with their history, on one page.
 
 </td>
 <td width="33%" valign="top">
 
-### 📦 OrbStack machines
+### OrbStack machines
 Create, limit, start/stop and share them, and see what runs inside.
 
 </td>
 <td width="33%" valign="top">
 
-### 🛰️ Other computers
+### Other computers
 A small agent reports from any Mac or Linux box on your tailnet.
 
 </td>
@@ -54,19 +54,19 @@ A small agent reports from any Mac or Linux box on your tailnet.
 <tr>
 <td valign="top">
 
-### 🗄️ Nightly backups
+### Nightly backups
 Apps, containers and folders on any host go into one snapshot.
 
 </td>
 <td valign="top">
 
-### 📱 Works where you are
+### Works where you are
 Open it from your phone over Tailscale. <kbd>⌘</kbd> <kbd>K</kbd> finds any page or action.
 
 </td>
 <td valign="top">
 
-### 🔒 Yours only
+### Yours only
 Answers this computer and your own Tailscale devices. Nothing is public unless you share it.
 
 </td>
@@ -115,12 +115,6 @@ Pick one during setup or under **Settings → General**, then fine-tune the acce
 corners and motion.
 
 <img src="docs/screenshots/themes.png" width="100%" alt="The overview in all nine themes">
-
-<details>
-<summary>The look step in setup</summary>
-<br>
-<img src="docs/screenshots/setup-look.png" width="720" alt="Setup: pick a look">
-</details>
 
 ## A tour
 

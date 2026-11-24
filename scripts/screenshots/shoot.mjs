@@ -82,7 +82,7 @@ function prepare({ rules, theme }) {
     });
 }
 
-const W = 1440, H = 900;
+const W = 1600, H = 900;   // 1600 wide: the overview fits three host cards a row
 let browser;
 async function newPage({ width = W, height = H, scale = 2, theme = 'dune', mobile = false } = {}) {
     const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: scale, colorScheme: 'dark',
@@ -106,10 +106,9 @@ async function open(page, hash, settle = 2500) {
     await page.evaluate(() => window.__scrub());
 }
 
-// Grows or shrinks the window to the page's content, so nothing is cut off and short pages
-// don't trail into empty space.
-async function fitHeight(page, { min = 720, max = 1500 } = {}) {
-    const h = await page.evaluate(() => {
+// How tall the window must be to show the whole page.
+function contentHeight(page) {
+    return page.evaluate(() => {
         const sa = document.querySelector('.scroll-area'), wrap = document.querySelector('.page-wrap');
         if (!sa || !wrap) return document.documentElement.scrollHeight;
         const top = sa.getBoundingClientRect().top;
@@ -117,7 +116,9 @@ async function fitHeight(page, { min = 720, max = 1500 } = {}) {
         const bottom = Math.max(...kids.map(k => k.getBoundingClientRect().bottom)) + sa.scrollTop;
         return Math.ceil(top + bottom + 40);
     });
-    const height = Math.max(min, Math.min(max, h));
+}
+const clamp = (h, { min = 720, max = 1500 } = {}) => Math.max(min, Math.min(max, h));
+async function setHeight(page, height) {
     await page.setViewportSize({ width: page.viewportSize().width, height });
     await page.waitForTimeout(600);
     await page.evaluate(() => window.__scrub());
@@ -135,54 +136,67 @@ async function machineName() {
 }
 
 // ---------------------------------------------------------------- the shots
+// Each shot is sized to its page's content. Shots the README shows side by side share a
+// pair id and get one height (the shorter page's), so the two images line up.
 const PAGES = [
-    // name, route, settle ms, height limits
+    // name, route, settle ms, height limits, pair
     ['overview', '#overview', 3500, { max: 1500 }],
     ['host', '#infra/arrakis', 3000, { max: 1300 }],
-    ['machines', '#infra/arrakis/vm', 2500, { max: 1100 }],
-    ['machine', null, 3000, { max: 1300 }],
-    ['storage', '#infra/arrakis/storage', 2500, { max: 1100 }],
-    ['tailscale', '#tailscale', 3000, { max: 1300 }],
+    ['machines', '#infra/arrakis/vm', 2500, { min: 900, max: 1100 }, 'machines'],
+    ['machine', null, 3000, { min: 900, max: 1100 }, 'machines'],
+    ['storage', '#infra/arrakis/storage', 2500, { min: 900, max: 1100 }, 'network'],
+    ['tailscale', '#tailscale', 3000, { min: 900, max: 1100 }, 'network'],
     ['backups', '#backups', 2500, { max: 1300 }],
-    ['terminal', '#terminal', 2500, { max: 1100 }],
-    ['databases', '#databases', 2500, { max: 1100 }],
+    ['terminal', '#terminal', 2500, { min: 900, max: 1100 }, 'tools'],
+    ['databases', '#databases', 2500, { min: 900, max: 1100 }, 'tools'],
     ['endpoints', '#endpoints', 12000, { max: 1000 }],   // live response times need a few rounds
 ];
 
 async function pages() {
     const page = await newPage();
     const vm = await machineName();
-    for (const [name, route, settle, fit] of PAGES) {
-        if (ONLY && !ONLY.has(name)) continue;
-        const hash = route || (vm ? `#infra/vm-${vm}` : null);
-        if (!hash) { console.log('  – machine: no machine found'); continue; }
+    const todo = PAGES.map(([name, route, settle, fit, pair]) => ({ name, settle, fit, pair,
+        hash: route || (vm ? `#infra/vm-${vm}` : null) }))
+        .filter(s => !ONLY || ONLY.has(s.name) || PAGES.some(p => p[4] && p[4] === s.pair && ONLY.has(p[0])));
+    // first pass: measure every page that is part of a pair
+    const pairH = {};
+    for (const s of todo.filter(s => s.pair && s.hash)) {
         await page.setViewportSize({ width: W, height: H });
-        await open(page, hash, settle);
-        await fitHeight(page, fit);
-        await shot(page, name);
+        await open(page, s.hash, 800);
+        const h = clamp(await contentHeight(page), s.fit);
+        pairH[s.pair] = Math.min(pairH[s.pair] ?? Infinity, h);
+    }
+    for (const s of todo) {
+        if (!s.hash) { console.log('  – machine: no machine found'); continue; }
+        await page.setViewportSize({ width: W, height: s.pair ? pairH[s.pair] : H });
+        await open(page, s.hash, s.settle);
+        await setHeight(page, s.pair ? pairH[s.pair] : clamp(await contentHeight(page), s.fit));
+        await shot(page, s.name);
     }
     await page.context().close();
 }
 
+// The name and machines steps of the first-run flow, cropped to the card and given one
+// height so they sit side by side.
 async function setup() {
-    if (ONLY && !['setup-name', 'setup-look', 'setup-machines'].some(n => ONLY.has(n))) return;
+    if (ONLY && !['setup-name', 'setup-machines'].some(n => ONLY.has(n))) return;
     const page = await newPage({ width: 1200, height: 1400 });
-    await open(page, '?setup', 1200);
-    const wrap = page.locator('.setup .wrap');
     const next = () => page.click('.ui-card-foot .ui-btn.primary').then(() => page.waitForTimeout(700));
-    const snap = async (name) => {
-        await page.evaluate(() => window.__scrub());
-        // the wrap stretches to the window; crop to what's actually in it
-        const b = await wrap.evaluate(w => {
-            const r = [...w.children].map(c => c.getBoundingClientRect()).filter(r => r.height);
-            const x = Math.min(...r.map(r => r.left)), y = Math.min(...r.map(r => r.top));
-            return { x, y, width: Math.max(...r.map(r => r.right)) - x, height: Math.max(...r.map(r => r.bottom)) - y };
-        });
-        await shot(page, name, { clip: { x: b.x - 40, y: b.y - 32, width: b.width + 80, height: b.height + 64 } });
-    };
-    await snap('setup-name'); await next();
-    await snap('setup-look'); await next();
-    await snap('setup-machines');
+    // the wrap stretches to the window; crop to what's actually in it
+    const box = () => page.locator('.setup .wrap').evaluate(w => {
+        const r = [...w.children].map(c => c.getBoundingClientRect()).filter(r => r.height);
+        const x = Math.min(...r.map(r => r.left)), y = Math.min(...r.map(r => r.top));
+        return { x: x - 40, y: y - 32, width: Math.max(...r.map(r => r.right)) - x + 80, height: Math.max(...r.map(r => r.bottom)) - y + 64 };
+    });
+    await open(page, '?setup', 1200);
+    const nameBox = await box();
+    await next(); await next();                              // past the look step
+    await page.evaluate(() => window.__scrub());
+    const machinesBox = await box();
+    const height = Math.max(nameBox.height, machinesBox.height);
+    await shot(page, 'setup-machines', { clip: { ...machinesBox, height } });
+    await open(page, '?setup', 600);
+    await shot(page, 'setup-name', { clip: { ...nameBox, height } });
     await page.click('.ui-btn.sm.exit').catch(() => {});   // the preview saves nothing; leave it tidily
     await page.context().close();
 }
