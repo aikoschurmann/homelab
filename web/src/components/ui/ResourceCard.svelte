@@ -98,8 +98,8 @@
     .addr { display: flex; gap: 12px; align-items: center; color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; }
     /* one footer height for every card: narrow cards drop addresses rather than wrap */
     @container (max-width: 520px) { .addr .lan { display: none; } }
-    /* (only when chips need the room: a card with none keeps its address, not an empty footer) */
-    @container (max-width: 400px) { .chips:not(:empty) + .addr { display: none; } }
+    /* narrow cards: no address at all (with or without chips), so cards side by side match */
+    @container (max-width: 400px) { .addr { display: none; } }
     .addr .ui-mono { font-size: 12px; }
     .mcard.off .mc-meters { opacity: 0.55; }
     .ts { display: inline-flex; align-items: center; gap: 6px; }

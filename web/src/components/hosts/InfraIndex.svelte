@@ -68,6 +68,8 @@
             // machines from its managed OrbStack, else its last inventory; a Mac's apps (OrbStack is the VM)
             const ms = h.vms?.machines, mCount = ms ? ms.filter(m => m.state === 'running').length : h.caps?.machines;
             const apps = (r.apps || []).filter(a => !/orbstack/i.test(a.name)).length;
+            // a Linux host's own services (not the standard system ones, nor this dashboard's agent)
+            const svcs = (r.workloads?.services || []).filter(u => !u.base && u.unit !== 'arrakis-agent').length;
             return {
                 id: h.id, name: h.name, online: h.online, icon: hostIcon(r.model, r.os), state: hostState(h), stateLabel: hostStateLabel(h),
                 sub: h.report ? [shortOs(r.os), r.cores ? `${r.cores} cores` : '', r.mem_total ? fmtGb(r.mem_total) : ''].filter(Boolean).join(' · ') : 'Agent not installed yet',
@@ -79,6 +81,7 @@
                     ...((h.caps?.orbstack === 'stopped' && !ms) || mCount ? [{ label: h.caps?.orbstack === 'stopped' && !ms ? 'VM stopped' : plural(mCount || 0, 'machine'), to: `${href.host(h.id)}/vm` }] : []),
                     ...(n ? [{ label: plural(n, 'container'), to: href.host(h.id) }] : []),
                     ...(apps ? [{ label: plural(apps, 'app'), to: `${href.host(h.id)}/apps` }] : []),
+                    ...(svcs ? [{ label: plural(svcs, 'service'), to: `${href.host(h.id)}/workloads` }] : []),
                 ] : [],
                 note: !h.online ? (h.last_seen ? `Offline · last report ${ago(h.last_seen)}` : 'Run the install command on it') : '',
                 search: [h.name, r.os, r.ip, r.hostname].filter(Boolean).join(' ').toLowerCase(),
