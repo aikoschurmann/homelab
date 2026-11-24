@@ -347,7 +347,7 @@
                         <tbody>
                             {#each runs || [] as r (r.timestamp)}
                                 <tr class="click" on:click={() => openRun = openRun === r.timestamp ? null : r.timestamp}>
-                                    <td><span class="strong">{fmtDate(r.started)}</span><small>{rel(r.started)}</small></td>
+                                    <td><span class="strong">{fmtDate(r.started)}</span><small>{rel(r.started)}{#if r.seconds}<span class="tk">{' · ' + took(r.seconds)}</span>{/if}</small></td>
                                     <td class="dim">{r.manual ? 'Back up now' : 'Scheduled'}</td>
                                     <td class="r num">{took(r.seconds)}</td>
                                     <td class="wrap">{#if r.state === 'running'}Running…{:else if r.state === 'failed'}<span class="bad">{r.problems[0] || 'Didn’t finish'}{r.problems.length > 1 ? ` (+${r.problems.length - 1} more)` : ''}</span>{:else}<span class="dim">OK</span>{/if}</td>
@@ -440,4 +440,12 @@
     @media (max-width: 560px) { .summary { grid-template-columns: 1fr; } }
     /* phone: what's inside is on the snapshot's own page; the list keeps date and size */
     @media (max-width: 640px) { table.snaps .ct { display: none; } table.snaps .w-when { width: auto; } }
+    /* phone runs: the date on one line, how long it took on the grey line under it */
+    .runs .tk { display: none; }
+    @media (max-width: 640px) {
+        .runs .w-when { width: auto; } .runs td:first-child { white-space: nowrap; }
+        .runs .w-took { width: 0; } .runs th:nth-child(3), .runs td:nth-child(3) { padding: 0; font-size: 0; }
+        .runs .tk { display: inline; }
+        .runs col:nth-child(4) { width: 72px; }
+    }
 </style>
