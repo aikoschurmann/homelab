@@ -15,18 +15,41 @@ from app.core.logger import log
 server_bp = Blueprint('server', __name__)
 
 
-def _machines():
+def _machine_info():
+    """OrbStack machines with what setup shows next to each: distro, version, running or not."""
     try:
         out = subprocess.run(["orb", "list", "-f", "json"], capture_output=True, text=True, timeout=10).stdout
-        return [m.get("name") for m in json.loads(out or "[]") if m.get("name")]
+        return [{"name": m["name"], "state": m.get("state") or "",
+                 "distro": (m.get("image") or {}).get("distro") or "",
+                 "version": (m.get("image") or {}).get("version") or ""}
+                for m in json.loads(out or "[]") if m.get("name")]
     except Exception:
         return []
+
+
+def _machines():
+    return [m["name"] for m in _machine_info()]
+
+
+def _port_free(port):
+    """True when nothing else listens on the port (the dashboard's own port counts as free)."""
+    if port == server_cfg.port():
+        return True
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("0.0.0.0", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
 
 
 def _info():
     from app.core.config import VM_NAME
     cfg = server_cfg.load()
     feats = server_cfg.features()
+    info = _machine_info() if feats["orbstack"] else []
     return {
         **cfg,
         "port_active": server_cfg.port(),
@@ -34,7 +57,8 @@ def _info():
         "os": {"Darwin": "macOS"}.get(platform.system(), platform.system()),
         "features": feats,
         "vm_name": VM_NAME if feats["orbstack"] else None,
-        "machines": _machines() if feats["orbstack"] else [],
+        "machines": [m["name"] for m in info],
+        "machine_info": info,
         "home": paths.HOME,
     }
 
@@ -42,6 +66,16 @@ def _info():
 @server_bp.route('', methods=['GET'])
 def get_server():
     return jsonify({"status": "success", "data": _info()})
+
+
+@server_bp.route('/port', methods=['GET'])
+def check_port():
+    try:
+        port = int(request.args.get("port", ""))
+    except ValueError:
+        return jsonify({"status": "error", "message": "Not a port"}), 400
+    ok = 1024 <= port <= 65535
+    return jsonify({"status": "success", "data": {"port": port, "valid": ok, "free": ok and _port_free(port)}})
 
 
 @server_bp.route('', methods=['PATCH'])
@@ -60,6 +94,8 @@ def patch_server():
             port = 0
         if not 1024 <= port <= 65535:
             return jsonify({"status": "error", "message": "Port must be between 1024 and 65535"}), 400
+        if not _port_free(port):
+            return jsonify({"status": "error", "message": f"Port {port} is already in use on this computer"}), 400
     vm = body.get("vm_name")
     restart = False
     if vm == "":                                  # explicitly none (no OrbStack machine yet)
