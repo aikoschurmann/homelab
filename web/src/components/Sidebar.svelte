@@ -110,8 +110,13 @@
     // opened only because you arrived there (like Tools): folds again when you leave, and isn't saved
     const treeAuto = new Set();
     const saveTree = () => save('arrakis_tree_open_v2', new Set([...treeOpen].filter(id => !treeAuto.has(id))));
-    function toggleNode(id) {
+    // Off the Infrastructure pages its roots (Hosts, Compute) show folded so the Tools below stay in
+    // view; a chevron there opens one just until you change page, without touching the saved state.
+    let peek = new Set(), peekTab = null;
+    $: if (activeTab !== peekTab) { peekTab = activeTab; peek = new Set(); }
+    function toggleNode(id, depth = 1) {
         clicked();
+        if (depth === 0 && activeTab !== 'Infra') { peek.has(id) ? peek.delete(id) : peek.add(id); peek = peek; return; }
         treeAuto.delete(id);
         treeOpen.has(id) ? treeOpen.delete(id) : treeOpen.add(id);
         treeOpen = treeOpen;
@@ -168,7 +173,7 @@
 
 {#snippet treeNode(n, depth)}
     {@const kids = n.children || []}
-    {@const open = treeOpen.has(n.id)}
+    {@const open = depth === 0 && activeTab !== 'Infra' ? peek.has(n.id) : treeOpen.has(n.id)}
     {@const here = activeTab === 'Infra' && n.id === activeLeaf}
     {@const within = !here && activePath.includes(n.id)}
     <div class="tn-row" class:active={here} class:in={within} class:tab={n.kind === 'tab'} class:page={n.kind === 'tab' && !['vm', 'apps', 'workloads'].includes(n.sub)} class:off={n.kind === 'host' && n.state !== 'running'} style="--d: {depth}"
@@ -177,9 +182,9 @@
         on:dragstart={(e) => n.kind === 'host' && hostDragStart(e, n.id)} on:dragover={(e) => n.kind === 'host' && hostDragOver(e, n.id)}
         on:dragleave={() => dropId === n.id && (dropId = null)} on:drop={(e) => n.kind === 'host' && hostDrop(e, n.id)} on:dragend={() => dragId = dropId = null}>
         {#if kids.length || n.kind === 'group'}
-            <button class="tn-car" class:open on:click={() => toggleNode(n.id)} aria-label="{open ? 'Collapse' : 'Expand'} {n.label}" aria-expanded={open}><ChevronRight size={13} /></button>
+            <button class="tn-car" class:open on:click={() => toggleNode(n.id, depth)} aria-label="{open ? 'Collapse' : 'Expand'} {n.label}" aria-expanded={open}><ChevronRight size={13} /></button>
         {:else}<span class="tn-car-sp"></span>{/if}
-        <button class="tn-btn" class:top={depth === 0} title={n.label} on:click={() => here && (kids.length || n.kind === 'group') ? toggleNode(n.id) : goNode(n.section, n.sub)} aria-current={here ? 'page' : null}>
+        <button class="tn-btn" class:top={depth === 0} title={n.label} on:click={() => here && (kids.length || n.kind === 'group') ? toggleNode(n.id, depth) : goNode(n.section, n.sub)} aria-current={here ? 'page' : null}>
             {#if n.kind === 'group'}<span class="tn-ic"><svelte:component this={n.id === 'compute' ? Cpu : Server} size={15} /></span>
             {:else if n.kind === 'host'}<span class="tn-ic" class:off={n.state !== 'running'}><svelte:component this={n.id === 'arrakis' ? hostIcon($arrakisModel, 'macOS') : hostIcon(($hosts || []).find(x => x.id === n.id)?.report?.model, ($hosts || []).find(x => x.id === n.id)?.report?.os)} size={15} /></span>
             {:else if n.kind === 'machine' || n.kind === 'pool'}<span class="state-dot {n.state}"></span>{/if}
