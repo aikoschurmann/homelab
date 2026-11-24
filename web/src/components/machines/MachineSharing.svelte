@@ -165,7 +165,7 @@
                                     <td class="perm">
                                         {#if k.perms}
                                             <button class="perm-btn" title="Open {k.user}'s permissions" on:click={() => openPerson(k.user)}>
-                                                <span class="pn" class:root={isRoot(k.perms)}>{presetOf(k.perms, schema)?.label || 'Custom'}{#if expired(k.perms)} <span class="exp">· expired</span>{/if}</span>
+                                                <span class="pn" class:root={isRoot(k.perms)}>{presetOf(k.perms, schema)?.label || 'Custom'}{#if expired(k.perms)}{' '}<span class="exp">· expired</span>{/if}</span>
                                                 <span class="ps">{permSummary(k.perms, schema)}</span>
                                             </button>
                                         {:else}<span class="ui-dim" title="Logs in as the machine's own user; its rights aren't managed here">Machine's own user</span>{/if}
@@ -202,7 +202,7 @@
     </section>
 
     <section class="ui-card" id="connect">
-        <div class="ui-card-head">
+        <div class="ui-card-head howto-head">
             <div><h2 class="ui-card-title">How to connect</h2><p class="ui-card-desc">What the other person runs on their computer. Copy it all and send it to them.</p></div>
             <button class="ui-btn sm" on:click={() => copy(message, 'all')}>{#if copied === 'all'}<Check size={13} /> Copied{:else}<Copy size={13} /> Copy instructions{/if}</button>
         </div>
@@ -239,9 +239,13 @@
     .addr-since { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
     .addr-warn { margin: 0; font-size: 13px; color: var(--text-secondary); }
     @media (max-width: 640px) {
-        .keys-head { flex-direction: column; align-items: stretch; gap: 10px; }
+        .keys-head, .howto-head { flex-direction: column; align-items: stretch; gap: 10px; }
+        .howto-head > :global(.ui-btn) { align-self: flex-start; }
         .keys-actions { justify-content: flex-start; }
         .addr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* the name keeps a readable width; permissions wrap instead of squeezing it to a sliver */
+        .keys td:first-child { min-width: 130px; }
+        .keys td.perm, .keys td.perm .ui-dim { white-space: normal; }
     }
     .keys .kn { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .keys .ic { width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; background: var(--highlight-10); color: var(--text-secondary); flex-shrink: 0; }
