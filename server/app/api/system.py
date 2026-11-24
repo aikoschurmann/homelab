@@ -3,6 +3,7 @@ from flask import Blueprint, jsonify, request
 import subprocess
 import json
 import os
+import shutil
 
 from app.core.logger import log
 from app.core.cache import global_state
@@ -707,6 +708,8 @@ def _parse_docker_uptime(status_str):
 
 
 def fetch_vm_containers_data():
+    if not shutil.which("orb"):
+        return []
     try:
         import json
         import re as _re_mod

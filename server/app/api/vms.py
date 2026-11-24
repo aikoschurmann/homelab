@@ -13,6 +13,7 @@ from flask import Blueprint, jsonify, request
 import json
 import os
 import re
+import shutil
 import subprocess
 import threading
 import time
@@ -859,6 +860,8 @@ def _sampler():
         except Exception as e:  # noqa: BLE001
             log.warning(f"machine sampler hosts: {e}")
             hosts = [None]
+        if not shutil.which("orb"):         # this computer has no OrbStack: other hosts only
+            hosts = [h for h in hosts if h is not None]
         passes = [orbhost.Thread(target=_sample_host, args=(h, tick), daemon=True) for h in hosts]
         for t in passes:
             t.start()

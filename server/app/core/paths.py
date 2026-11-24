@@ -31,6 +31,8 @@ for _d, _mode in ((HOME, 0o700), (DATA, 0o700), (CACHE, 0o700), (SECRETS, 0o700)
     os.makedirs(_d, mode=_mode, exist_ok=True)
 
 LEGACY_HOME = os.path.expanduser("~")
+# the volume "storage used" means: a Mac keeps its data apart from the sealed system volume
+DATA_VOLUME = "/System/Volumes/Data" if os.path.isdir("/System/Volumes/Data") else "/"
 # Only the default location takes over pre-repo files: a second install or a test one with
 # its own HOMELAB_HOME starts empty instead of inheriting old hosts, prefs and secrets.
 # HOMELAB_ADOPT_LEGACY=0/1 overrides.

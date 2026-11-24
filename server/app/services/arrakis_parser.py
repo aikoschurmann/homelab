@@ -4,7 +4,7 @@ import psutil
 from datetime import datetime
 
 from app.core.config import VM_NAME, VM_CMD_PREFIX
-from app.core import server_cfg
+from app.core import server_cfg, paths
 
 def parse_arrakis_native():
     """
@@ -32,10 +32,10 @@ def parse_arrakis_native():
                 free_val = float(free_m.group(1))
                 data["host"]["details"]["Disk Space"] = f"{total_val - free_val:.1f}G / {total_val:.1f}G"
             else:
-                usage = psutil.disk_usage('/System/Volumes/Data')
+                usage = psutil.disk_usage(paths.DATA_VOLUME)
                 data["host"]["details"]["Disk Space"] = f"{usage.used / 10**9:.1f}G / {usage.total / 10**9:.1f}G"
         else:
-            usage = psutil.disk_usage('/System/Volumes/Data')
+            usage = psutil.disk_usage(paths.DATA_VOLUME)
             data["host"]["details"]["Disk Space"] = f"{usage.used / 10**9:.1f}G / {usage.total / 10**9:.1f}G"
     except Exception:
         pass

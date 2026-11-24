@@ -1,4 +1,4 @@
-import re, time, sys, subprocess, threading, os, json, html, psutil
+import re, time, sys, subprocess, threading, os, json, html, psutil, shutil
 from app.core.logger import log
 from app.core.config import VM_CMD_PREFIX
 from app.core.cache import global_state
@@ -33,7 +33,7 @@ def poll_metrics_loop():
                     global_state.stats["host"]["details"]["CPU Usage"] = f"{cpu:.1f}%"
                     global_state.stats["host"]["details"]["Memory"] = f"{used_mem / (1024**3):.2f}G / {psutil.virtual_memory().total / (1024**3):.2f}G"
             try:
-                usage = psutil.disk_usage('/System/Volumes/Data')
+                usage = psutil.disk_usage(paths.DATA_VOLUME)
                 with global_state.lock:
                     global_state.storage['total'] = usage.total
                     global_state.storage['used'] = usage.used
@@ -145,9 +145,12 @@ def poll_background_loop():
     while True:
         try:
             # brew refreshes its index first and can take well over 5 s
-            brew = subprocess.run(['/opt/homebrew/bin/brew', 'outdated', '--quiet'], capture_output=True, text=True, timeout=60)
-            if brew.returncode == 0:
+            from app.api.updates import BREW
+            brew = subprocess.run([BREW, 'outdated', '--quiet'], capture_output=True, text=True, timeout=60) if BREW else None
+            if brew and brew.returncode == 0:
                 with global_state.lock: global_state.bg['updates_host'] = str(len([l for l in brew.stdout.split('\n') if l.strip()]))
+            if not shutil.which("orb"):     # no OrbStack (yet): nothing below applies
+                time.sleep(300); continue
             apt = subprocess.run(VM_CMD_PREFIX + ["sh", "-c", "if command -v apk >/dev/null; then apk list --upgradable 2>/dev/null | grep -c .; "
                                                   "else apt list --upgradable 2>/dev/null | grep -c -v Listing; fi; true"], capture_output=True, text=True, timeout=30)
             if apt.returncode == 0:
@@ -258,6 +261,8 @@ def start_all_pollers():
 def docker_events_loop():
     last_update = 0
     while True:
+        if not shutil.which("orb"):         # checked again each minute, in case it's installed
+            time.sleep(60); continue
         try:
             with subprocess.Popen(VM_CMD_PREFIX + ["docker", "events", "--format", "{{json .}}"], stdout=subprocess.PIPE, text=True) as p:
                 for line in p.stdout:
