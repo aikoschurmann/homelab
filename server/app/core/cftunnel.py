@@ -30,7 +30,6 @@ from app.core import orbhost
 from app.core.logger import log
 from app.core import paths
 
-DEFAULT_DOMAIN = "aikoschurmann.com"
 TOKEN_FILE = paths.secret("cloudflare")  # never sent to the browser
 STATE_FILE = paths.state("shares")
 REMOTE_DIR = "/etc/cloudflared/share"
@@ -66,8 +65,9 @@ def _write_token_file(data):
 
 
 def domain():
-    """The zone shared machines get their names under: env var, then the saved choice."""
-    return os.environ.get("HOMELAB_SHARE_DOMAIN") or _token_file().get("domain") or DEFAULT_DOMAIN
+    """The zone shared machines get their names under: env var, then the saved choice
+    (Settings → Sharing). Empty until one is picked."""
+    return os.environ.get("HOMELAB_SHARE_DOMAIN") or _token_file().get("domain") or ""
 
 
 def zones():
@@ -240,6 +240,8 @@ def _cf(method, path, body=None):
 def _zone():
     """(zone id, account id) for the sharing domain."""
     if "zone" not in _ids:
+        if not domain():
+            raise RuntimeError("Pick the domain shared machines go under in Settings → Sharing")
         found = _cf("GET", f"/zones?name={urllib.parse.quote(domain())}")
         if not found:
             raise RuntimeError(f"The API token can't see the zone {domain()}")
