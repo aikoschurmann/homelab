@@ -57,7 +57,7 @@
                 {#each list.slice(0, 6) as d (d.id)}
                     <a class="d-row" class:idle={d.state !== 'active'} href="#tailscale/{deviceId(d)}" title={tip(d)}>
                         <span class="ts-ic">{#if isShared(d)}<Users size={14} />{:else if PHONE_OS.includes(d.os)}<Smartphone size={14} />{:else}<Monitor size={14} />{/if}</span>
-                        <span class="d-nm"><b>{displayName(d)}</b><small>{#if d.connection}<span class="pth {d.connection}">{d.connection === 'direct' ? 'Direct' : 'Relayed'}</span> · {/if}{[d.os, d.ip].filter(Boolean).join(' · ')}</small></span>
+                        <span class="d-nm"><b>{displayName(d)}</b><small>{#if d.connection}<span class="pth {d.connection}">{d.connection === 'direct' ? 'Direct' : 'Relayed'}</span>{' · '}{/if}{[d.os, d.ip].filter(Boolean).join(' · ')}</small></span>
                         <span class="d-tr"><span>{total(d) ? tsBytes(total(d)) : '—'}</span>{#if total(d)}<small><ArrowDown size={10} />{tsBytes(d.rx_bytes)} <ArrowUp size={10} />{tsBytes(d.tx_bytes)}</small>{/if}</span>
                     </a>
                 {:else}<div class="d-none">None</div>{/each}

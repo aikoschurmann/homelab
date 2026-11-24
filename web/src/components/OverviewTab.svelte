@@ -549,7 +549,7 @@
             {@const c = SC[k]}
             <a class="sc" href={c.to}>
                 <span class="sc-ic"><svelte:component this={c.icon} size={16} /></span>
-                <span class="sc-main"><span class="sc-k">{c.k}</span><span class="sc-v">{c.v} <small>{#if c.v && c.s}<i class="sep">· </i>{/if}{c.s}</small></span></span>
+                <span class="sc-main"><span class="sc-k">{c.k}</span><span class="sc-v">{c.v} <small>{#if c.v && c.s}<i class="sep">{'· '}</i>{/if}{c.s}</small></span></span>
                 <ArrowRight size={14} class="sc-go" />
             </a>
         {:else}<div class="ui-card ui-empty">No shortcuts picked. Add some under Customize.</div>{/each}
