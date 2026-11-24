@@ -31,15 +31,75 @@ export const additive = (unit) => unit !== 'pct' && unit !== 'c';
 // tablet, 2 on a phone, 8 on a very wide screen): Small 1×1, Medium 2×1, Large 2×2, Wide a
 // whole row 1 high. Heights are always one or two cells, so nothing stretches to a neighbour.
 // (kept in a widget's `width` field)
-export const SIZE_NAMES = { s: 'Small', m: 'Medium', l: 'Large', full: 'Wide' };
-export const SIZES = { line: [['m', 'Medium'], ['l', 'Large'], ['full', 'Wide']], bars: [['m', 'Medium'], ['full', 'Wide']], gauge: [['s', 'Small']] };
+// Every size is named by its share of the row (on a desktop-wide page, 6 cells): a widget 1/6
+// (one cell), 1/3 (two), 1/3 tall (two by two) or the full width; a section or card 1/3, 1/2 or
+// the full width. (kept in a widget's `width` field, a section's cfg `cell`)
+const W = [['s', '1/6'], ['m', '1/3'], ['l', '1/3 tall'], ['full', 'Full width']];
+const pick = (...k) => W.filter(([z]) => k.includes(z));
+const SHARE = [['auto', 'Auto'], ['m', '1/3'], ['half', '1/2'], ['full', 'Full width']];
+export const SIZES = { line: pick('m', 'l', 'full'), bars: pick('m', 'full'), gauge: pick('s'),
+    // sections that sit on the grid as widgets do
+    avatar: pick('s', 'm', 'l'), text: pick('s', 'm', 'l', 'full'),
+    // host and machine cards (Auto: as many to a row as fit at 380px or more, as the Infrastructure
+    // page's cards), and every other section
+    host: SHARE, machine: SHARE, section: SHARE.slice(1) };
+export const sizeName = (type, z) => (SIZES[type] || SIZES.line).find(x => x[0] === z)?.[1] || z;
+
+// ---- sizes per card (what the Overview's grid uses) ------------------------------------------
+// Each kind of card has the widths that make sense for it, and for each width its height in cells
+// (a cell: a square, 6 to a row on a desktop). Most have one height per width, set by what they
+// show at that width; a few (graphs, avatar, text) can be 1 or 2 high. The first listed is the
+// default. Widths are a share of the row on a desktop-wide page.
+export const WIDTH_NAMES = { auto: 'Auto', '1/6': '1/6', '1/3': '1/3', '1/2': '1/2', '2/3': '2/3', full: 'Full width' };
+const SIXTHS = { '1/6': 1, '1/3': 2, '1/2': 3, '2/3': 4, full: 6 };
+const one = (ws, hs) => Object.fromEntries(ws.map(w => [w, hs]));
+export const CARD_SIZES = {
+    // Only a width is chosen. A row is as tall as the tallest thing in it and everything in it
+    // stretches to that; a widget, the avatar or a text card is at least one cell (a square) tall.
+    line: one(['1/3', '2/3', 'full'], ['auto']), bars: one(['1/3', 'full'], ['auto']), gauge: { '1/6': ['auto'] },
+    avatar: one(['1/6', '1/3'], ['auto']), text: one(['1/6', '1/3', '1/2', '2/3', 'full'], ['auto']),
+    host: one(['1/3', '1/2'], ['auto']), machine: one(['1/3', '1/2'], ['auto']),
+    totals: one(['full', '1/2', '1/3'], ['auto']), attention: one(['full', '1/2', '1/3'], ['auto']),
+    tailscale: one(['full', '1/2'], ['auto']), shortcuts: one(['full', '1/2', '1/3'], ['auto']),
+    compute: one(['full', '1/2'], ['auto']), pihole: one(['full', '1/2'], ['auto']), uptime: one(['full', '1/2'], ['auto']),
+    'api-latency': one(['full', '1/2'], ['auto']), rack: one(['full', '1/2'], ['auto']),
+    webapps: { full: ['auto'] },
+    section: one(['full', '1/2'], ['auto']),
+};
+const sizesOf = (type) => CARD_SIZES[type] || CARD_SIZES.section;
+export const widthsFor = (type) => Object.keys(sizesOf(type));
+export const heightsFor = (type, wk) => sizesOf(type)[wk] || [1];
+export const heightName = (h) => `${h} high`;
+// a card's width and height: what it was set to if that's one of its sizes, else the nearest from
+// its older single size, else its first
+const OLD = { s: '1/6', m: '1/3', l: '1/3', full: 'full', half: '1/2', auto: '1/3' };
+export function dimsOf(type, w, h, old) {
+    const ws = widthsFor(type);
+    const ow = OLD[old] || OLD[sizeFor(type, old)];
+    const wk = ws.includes(w) ? w : ws.includes(ow) ? ow : ws[0];
+    const hs = heightsFor(type, wk);
+    const oh = old === 'l' ? 2 : null;
+    const hk = hs.includes(h) ? h : hs.includes(+h) ? +h : hs.includes(oh) ? oh : hs[0];
+    return { wk, hk };
+}
+const SMALL = ['line', 'bars', 'gauge', 'avatar', 'text', 'host', 'machine'];
+export const isSection = (type) => !SMALL.includes(type);
+// cells across for a width on a row of n cells: exact on a desktop; a tablet rounds up (a third is
+// half the row) and gives sections the whole row; a phone gives everything but 1/6 the whole row
+export function colsFor(wk, n, type, fitCols) {
+    if (wk === 'auto') return Math.min(n, fitCols || Math.ceil(n / 2));
+    const c6 = SIXTHS[wk] || 2;
+    if (wk === 'full' || (n <= 2 && c6 > 1)) return n;
+    if (n <= 4) return !SMALL.includes(type) ? n : Math.min(n, Math.ceil(c6 * n / 6));
+    return Math.min(n, Math.max(1, Math.round(c6 * n / 6)));
+}
 // a gauge: one host's ring in a small square
 export const small = (c) => c.type === 'gauge';
 // a size for this kind (older layouts: Auto/Third → Medium, Half → Large graph, Full → Wide)
 export function sizeFor(type, w) {
     const ok = (SIZES[type] || SIZES.line).map(x => x[0]);
     if (ok.includes(w)) return w;
-    if (type === 'gauge') return 's';
+    if (ok.length === 1) return ok[0];
     if (w === 'full') return 'full';
     if (w === 'half' && ok.includes('l')) return 'l';
     return 'm';
@@ -49,7 +109,15 @@ export const cellsFor = (w) => w >= 1600 ? 8 : w >= 1000 ? 6 : w >= 620 ? 4 : 2;
 export function cellOf(w, gap = 16) { const n = cellsFor(w); return { n, unit: (w - (n - 1) * gap) / n }; }
 // a widget's grid spans: [columns, rows]
 export function spanOf(c, cells) {
+    if (c.wk) return [colsFor(c.wk, cells, c.type, c.fitCols), c.hk === 'auto' ? 1 : +c.hk];
     const s = sizeFor(c.type, c.width);
+    // a card or section: a width, its row as tall as it needs. A phone gives each the whole row;
+    // a tablet too, except host and machine cards (two to a row there)
+    if (c.rows) {
+        const whole = s === 'full' || cells <= 2 || (cells <= 4 && c.type === 'section');
+        const third = cells >= 6 ? Math.round(cells / 3) : Math.min(2, cells);
+        return [whole ? cells : s === 'auto' ? (c.fitCols || Math.ceil(cells / 2)) : s === 'half' ? Math.ceil(cells / 2) : third, c.rows];
+    }
     return s === 's' ? [1, 1] : s === 'm' ? [2, 1] : s === 'l' ? [2, 2] : [cells, 1];
 }
 // how big a widget of that size is on a page this wide: {w, h} in px
@@ -74,7 +142,14 @@ export function gridLayout(cards, n) {
     // placed by hand: where they were put (pushed down if two ever overlap)
     for (const s of fixed) {
         const p = { x: Math.max(0, Math.min(n - s.w, s.c.pos[n].x)), y: s.c.pos[n].y, w: s.w, h: s.h };
-        while (!free(p)) p.y++;
+        // in the way (it grew, or the screen is narrower): the nearest free spot on its own row,
+        // else the next rows down, from the left
+        if (!free(p)) {
+            const xs = [...Array(n - s.w + 1).keys()];
+            const near = xs.slice().sort((a, b) => Math.abs(a - p.x) - Math.abs(b - p.x)).find(x => free({ ...p, x }));
+            if (near != null) p.x = near;
+            else for (p.y++; ; p.y++) { const x = xs.find(x => free({ ...p, x })); if (x != null) { p.x = x; break; } }
+        }
         put(s.c.id, p);
     }
     // the rest in order, from below those (or from the top when none were placed by hand)
@@ -84,6 +159,21 @@ export function gridLayout(cards, n) {
         while (!free(p)) { p.x++; if (p.x + p.w > n) { p.x = 0; p.y++; } }
         put(s.c.id, p); r = p.y; c = p.x + p.w;
     }
+    // the avatar or a text card on Auto height: as tall as the tallest item that starts on its row,
+    // as far as the cells under it are free
+    for (const s of sized.filter(s => s.c.fill)) {
+        const p = out[s.c.id], others = Object.entries(out).filter(([k]) => k !== s.c.id).map(([, q]) => q);
+        const want = Math.max(1, ...others.filter(q => q.y === p.y).map(q => q.h));
+        while (p.h < want && !others.some(q => hit({ ...p, h: p.h + 1 }, q))) p.h++;
+    }
+    return closeRows(out);
+}
+// rows with nothing in them close up (gaps beside a widget stay), so nothing floats below blank space
+function closeRows(out) {
+    const used = new Set();
+    for (const p of Object.values(out)) for (let y = p.y; y < p.y + p.h; y++) used.add(y);
+    const rows = [...used].sort((a, b) => a - b), at = new Map(rows.map((y, i) => [y, i]));
+    for (const p of Object.values(out)) p.y = at.get(p.y);
     return out;
 }
 // one widget moved to (x, y): whatever is in its way moves out of it. One widget of the same
@@ -96,9 +186,38 @@ export function pushLayout(snap, id, x, y, n) {
     const out = { [id]: at };
     const others = Object.entries(snap).filter(([k]) => k !== id).sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x);
     const inWay = others.filter(([, o]) => hit(o, at));
-    if (inWay.length === 1 && inWay[0][1].w === me.w && inWay[0][1].h === me.h && !hit(me, at)) out[inWay[0][0]] = { ...inWay[0][1], x: me.x, y: me.y };
+    // (not a whole-row item: those insert where they're dropped, the rest moving down, as a list does)
+    if (me.w < n && inWay.length === 1 && inWay[0][1].w === me.w && inWay[0][1].h === me.h && !hit(me, at)) out[inWay[0][0]] = { ...inWay[0][1], x: me.x, y: me.y };
     for (const [k, o] of others) {
         if (out[k]) continue;
+        const p = { ...o };
+        while (Object.values(out).some(q => hit(p, q))) p.y++;
+        out[k] = p;
+    }
+    return out;
+}
+// the arrows: a widget and the one before / after it in reading order trade places. On one row
+// the pair keeps its span (the later one now starts where the earlier one did); across rows each
+// takes the other's spot. Anything then in the way moves down.
+const reading = (a, b) => a.y - b.y || a.x - b.x;
+export function swapLayout(snap, id, d, n) {
+    const order = Object.entries(snap).sort((a, b) => reading(a[1], b[1])).map(([k]) => k);
+    const i = order.indexOf(id), j = i + d;
+    if (i < 0 || j < 0 || j >= order.length) return null;
+    const other = order[j], A = snap[id], B = snap[other];
+    const fit = (p, x) => Math.max(0, Math.min(n - p.w, x));
+    let a, b;
+    if (A.y === B.y) {
+        const [first, second] = d < 0 ? [A, B] : [B, A];      // first = whichever ends up on the left
+        const L = Math.min(A.x, B.x);
+        const p1 = { ...first, x: fit(first, L) }, p2 = { ...second, x: fit(second, L + first.w) };
+        [a, b] = d < 0 ? [p1, p2] : [p2, p1];
+    } else {
+        a = { ...A, x: fit(A, B.x), y: B.y };
+        b = { ...B, x: fit(B, A.x), y: A.y };
+    }
+    const out = { [id]: a, [other]: b };
+    for (const [k, o] of Object.entries(snap).filter(([k]) => k !== id && k !== other).sort((x, y) => reading(x[1], y[1]))) {
         const p = { ...o };
         while (Object.values(out).some(q => hit(p, q))) p.y++;
         out[k] = p;
@@ -241,6 +360,9 @@ function norm(l) {
             title: typeof c.title === 'string' ? c.title.slice(0, 60) : '',
             // its own time range (null: the layout's)
             range: RANGES.some(r => r[0] === c.range) ? c.range : null,
+            // its width and height on the Overview's grid (set in its bar; dimsOf checks them against its sizes)
+            ...(typeof c.w === 'string' && c.w in SIXTHS ? { w: c.w } : {}),
+            ...([1, 2].includes(+c.h) ? { h: +c.h } : {}),
             // where it sits, per grid (cells to a row): { 6: {x, y}, ... } — placed by hand
             pos: Object.fromEntries(Object.entries(c.pos || {}).filter(([n, p]) => +n > 0 && p && Number.isInteger(p.x) && Number.isInteger(p.y) && p.x >= 0 && p.y >= 0).map(([n, p]) => [n, { x: p.x, y: p.y }])),
         })),

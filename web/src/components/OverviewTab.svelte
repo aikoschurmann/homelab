@@ -51,7 +51,7 @@
     import RackCard from './overview/RackCard.svelte';
     import TextCard from './overview/TextCard.svelte';
     import AvatarCard from './overview/AvatarCard.svelte';
-    import { setCfg, AVATAR_LOOKS } from '../lib/widgets.js';
+    import { setCfg, AVATAR_LOOKS, GRID_SECTIONS } from '../lib/widgets.js';
     import MetricsGrid from './metrics/MetricsGrid.svelte';
 
     export let stats;
@@ -290,30 +290,21 @@
         : t.startsWith('h:') ? hostIds.includes(baseOf(t.slice(2)))
         : t.startsWith('v:') ? machineNames.includes(baseOf(t.slice(2)))
         : !!label[baseOf(t)] && (t.includes('#') || show(t)));
+    // metric widgets and the small sections (avatar, text) share one grid of cells
+    const inGrid = (t) => t !== 'metrics';
     $: groups = (() => {
         const out = [];
         for (const id of shown) {
-            // metric widgets next to each other share one grid
-            if (id.startsWith('m:')) { const last = out.at(-1); if (last?.metric) last.ids.push(id); else out.push({ key: id, metric: true, ids: [id] }); continue; }
-            // host cards next to each other sit side by side, as cards do
-            if (id.startsWith('h:') || id.startsWith('v:')) { const last = out.at(-1); if (last?.hostrun) last.ids.push(id); else out.push({ key: id, hostrun: true, ids: [id] }); continue; }
+            // widgets next to each other share one grid
+            if (inGrid(id)) { const last = out.at(-1); if (last?.metric) last.ids.push(id); else out.push({ key: id, metric: true, ids: [id] }); continue; }
             if (id === 'metrics') continue;
-            // the avatar is a small square: it sits beside a half-width neighbour, as a half does
-            // (one beside it, even on narrower screens, where halves go full width)
-            const av = baseOf(id) === 'avatar', last = out.at(-1);
-            const half = $layout.widths[id] === 'half' || av;
-            if (narrow) {
-                if (av) out.push({ key: id, half: true, av: true, ids: [id] });
-                else if (last?.av && last.ids.length === 1) last.ids.push(id);
-                else out.push({ key: id, half: false, ids: [id] });
-                continue;
-            }
-            if (half && last?.half && (!(av || last.av) || last.ids.length === 1)) { last.ids.push(id); if (av) last.av = true; }
-            else out.push({ key: id, half, av, ids: [id] });
+            const last = out.at(-1), half = $layout.widths[id] === 'half' && !narrow;
+            if (half && last?.half && last.ids.length === 1) last.ids.push(id);
+            else out.push({ key: id, half, ids: [id] });
         }
         // a line of cards keeps its block while only the order inside it changes (a key from its
         // first item would rebuild it, the page shrinking for a moment and the scroll jumping)
-        for (const g of out) if (g.half || g.hostrun) g.key = (g.half ? 'p:' : 'h:') + [...g.ids].sort().join(',');
+        for (const g of out) if (g.half) g.key = 'p:' + [...g.ids].sort().join(',');
         return out;
     })();
     // the shortcuts picked under Customize: each page with one figure of what it holds
@@ -368,7 +359,7 @@
     let setOpen = false, setId = null, galOpen = false;
     const tileName = Object.fromEntries(Object.values(SECTION_TILES).flat().map(t => [t.id, t.label]));
     // a section's width as laid out, and how many totals tiles fit across it (as InfraIndex: >= ~240px each)
-    $: secW = (id) => $layout.widths[id] === 'half' && !narrow ? (secsW - 16) / 2 : secsW;
+    $: secW = (id) => { const c = $layout.cfg[id]?.cell || ($layout.widths[id] === 'half' ? 'half' : 'full'); return narrow || c === 'full' ? secsW : c === 'half' ? (secsW - 16) / 2 : secsW / 3; };
     $: totShown = ($layout.tile_order.totals || []).filter(t => !$layout.hidden_tiles.includes(t));
     // the per-row choices that do something here: no more than fit, nor than there are tiles
     $: colChoices = (id) => { const most = Math.min(totShown.length, Math.max(1, Math.floor((secW(id) + 12) / 252))); return COLS.filter(c => c === 'auto' || +c <= most); };
@@ -385,7 +376,8 @@
     let secsEl, secsW = 1100;
     // put what was picked on the page: section (or a copy), a card, metric widget(s); its items
     function create(spec) {
-        if (spec.kind === 'section') { const t = fresh(spec.id); setWidthOf(t, spec.width); if (spec.cfg) setCfg(t, spec.cfg); return [t]; }
+        // (the gallery's Full / Half is its width on the grid: 1/2 or the whole row)
+        if (spec.kind === 'section') { const t = fresh(spec.id); setWidthOf(t, spec.width); setCfg(t, { ...(spec.cfg || {}), ...(spec.width ? { w: spec.width === 'half' ? '1/2' : 'full' } : {}) }); return [t]; }
         if (spec.kind === 'host') return [fresh('h:' + spec.id)];
         if (spec.kind === 'machine') return [fresh('v:' + spec.id)];
         const each = spec.each?.length ? spec.each : null;
@@ -454,16 +446,18 @@
         }
     }
     const setWidthOf = (id, w) => setWidth(id, w);
-    // a pair with the avatar in it: the square keeps its size, the other takes the rest
-    const pairCols = (ids) => ids.some(t => baseOf(t) === 'avatar') ? `grid-template-columns: ${ids.map(t => baseOf(t) === 'avatar' ? 'auto' : 'minmax(0, 1fr)').join(' ')}${ids.every(t => baseOf(t) === 'avatar') ? '; justify-content: start' : ''}` : '';
     const openSettings = (id) => { setId = id; setOpen = true; };
     const done = () => goPage(pageId);
 
     // the metric widgets take their places among the sections once both layouts are in
     let both = false;
-    $: both && syncMetrics($mlayout.cards.map(c => c.id));
-    $: both && $hosts && syncHosts(hostIds);
-    $: both && $machines && syncMachines(machineNames);
+    // Run just after this update (a layout saved from inside it isn't seen by the page until the
+    // next one), and again whenever the layout changes: Reset brings back the place holders that
+    // become the host and machine cards. (Each only saves when something changed.)
+    const later = (fn) => Promise.resolve().then(fn);
+    $: both && $layout && later(() => syncMetrics($mlayout.cards.map(c => c.id)));
+    $: both && $layout && $hosts && later(() => syncHosts(hostIds));
+    $: both && $layout && $machines && later(() => syncMachines(machineNames));
     onMount(() => {
         Promise.all([fetchLayout(), loadMetrics()]).then(() => both = true);
         fetchHistory(); fetchDatabases(); fetchBackup(); fetchTailnet(); fetchEndpoints(); fetchMachines(); fetchMachineUsage(); fetchServices(); fetchHosts(); fetchDisks();
@@ -631,6 +625,22 @@
          just like a widget; a click opens its settings -->
     <!-- data-group: the cards of one line (host cards, a half-width pair); something of another
          kind dragged over them treats the line as one block, so it never splits it -->
+    <!-- a section on the widgets' grid: its own settings in its bar (the grid adds grip, size, move, remove) -->
+    {#snippet gridTools(id)}
+        {@const kind = baseOf(id)}
+        {#if kind === 'avatar'}
+            <span class="grp" data-nodrag role="group" aria-label="Look">{#each AVATAR_LOOKS as [k, l]}<button type="button" class="tg" class:on={($layout.cfg[id]?.look || 'visor') === k} on:click={() => setCfg(id, { look: k })}>{l}</button>{/each}</span>
+        {:else if kind === 'text'}
+            <span class="grp" data-nodrag role="group" aria-label="Text size">{#each [['normal', 'Normal'], ['big', 'Large']] as [k, l]}<button type="button" class="tg" class:on={($layout.cfg[id]?.size === 'big' ? 'big' : 'normal') === k} on:click={() => setCfg(id, { size: k })}>{l}</button>{/each}</span>
+        {/if}
+        {#if SECTION_TILES[kind]}
+            <span class="grp" data-nodrag role="group" aria-label="Tiles shown">{#each tileChoices(id, kind) as t (t)}<button type="button" class="tg" class:on={!$layout.hidden_tiles.includes(t)} aria-pressed={!$layout.hidden_tiles.includes(t)} title="{$layout.hidden_tiles.includes(t) ? 'Show' : 'Hide'} {tileName[t]}" on:click={() => toggleTile(t)}>{tileName[t]}</button>{/each}</span>
+        {/if}
+        {#if kind === 'totals' && colChoices(id).length > 2}
+            <span class="grp" data-nodrag role="group" aria-label="Tiles per row" title="Tiles per row">{#each colChoices(id) as c}<button type="button" class="tg" class:on={String($layout.totals_cols) === String(c)} on:click={() => setTotalsCols(c)}>{c === 'auto' ? 'Fit' : c}</button>{/each}</span>
+        {/if}
+        {#if kind === 'shortcuts' || kind === 'host'}<span class="grp" data-nodrag><button type="button" class="tg" title="More settings of {nameOf(id)}" on:click={() => openSettings(id)}><Pencil size={13} /></button></span>{/if}
+    {/snippet}
     {#snippet item(id, grp = '')}
         {#if customizing}
             {@const n = shown.indexOf(id)}
@@ -648,6 +658,9 @@
                     {/if}
                     {#if kind === 'avatar'}
                         <i></i>{#if narrow}<select class="lk" data-nodrag aria-label="Look" value={$layout.cfg[id]?.look || 'visor'} on:change={(e) => setCfg(id, { look: e.currentTarget.value })}>{#each AVATAR_LOOKS as [k, l]}<option value={k}>{l}</option>{/each}</select>{:else}<span class="grp" data-nodrag role="group" aria-label="Look">{#each AVATAR_LOOKS as [k, l]}<button type="button" class="tg" class:on={($layout.cfg[id]?.look || 'visor') === k} on:click={() => setCfg(id, { look: k })}>{l}</button>{/each}</span>{/if}
+                    {/if}
+                    {#if kind === 'text'}
+                        <i></i><span class="grp" data-nodrag role="group" aria-label="Text size">{#each [['normal', 'Normal'], ['big', 'Large']] as [k, l]}<button type="button" class="tg" class:on={($layout.cfg[id]?.size === 'big' ? 'big' : 'normal') === k} on:click={() => setCfg(id, { size: k })}>{l}</button>{/each}</span>
                     {/if}
                     {#if !isCard(id) && !narrow && kind !== 'avatar'}
                         <i></i><span class="grp" data-nodrag role="group" aria-label="Width"><button type="button" class="tg" class:on={$layout.widths[id] !== 'half'} on:click={() => setWidth(id, 'full')}>Full</button><button type="button" class="tg" class:on={$layout.widths[id] === 'half'} on:click={() => setWidth(id, 'half')}>Half</button></span>
@@ -669,10 +682,9 @@
 
     <div class="secs" bind:this={secsEl} bind:clientWidth={secsW} use:sortable={{ onMove: (ids) => customizing && moveShown(ids) }}>
     {#each groups as g (g.key)}
-        {#if g.hostrun}<div class="ui-cardgrid hrun">{#each g.ids as id (id)}{@render item(id, 'h|' + g.key)}{/each}</div>
-        {:else if g.metric}<MetricsGrid ids={g.ids.map(t => t.slice(2))} editing={customizing} nOf={(t) => shown.indexOf(t)} total={shown.length} arrange={reorderWithin} />
+        {#if g.metric}<MetricsGrid ids={g.ids} editing={customizing} nOf={(t) => shown.indexOf(t)} total={shown.length} arrange={reorderWithin} sec={section} tools={gridTools} onRemove={removeItem} {nameOf} />
         {:else if g.half}
-            <div class="pair" style={pairCols(g.ids)}>{#each g.ids as id (id)}{@render item(id, 'p|' + g.key)}{/each}</div>
+            <div class="pair">{#each g.ids as id (id)}{@render item(id, 'p|' + g.key)}{/each}</div>
         {:else}{@render item(g.ids[0])}{/if}
     {/each}
     {#if customizing && !shown.length}<div class="ui-card ui-empty">Nothing on the page. Add sections and widgets with Add.</div>{/if}
@@ -769,7 +781,8 @@
 
     /* shortcuts */
     /* as many across as fit (at least 220px each), never more than there are */
-    .shortcuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(220px, calc((100% - 36px) / min(var(--n), 4))), 1fr)); gap: 12px; align-content: start; }
+    /* beside something taller (Tailscale, say) the tiles share its height rather than leave a gap under them */
+    .shortcuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(220px, calc((100% - 36px) / min(var(--n), 4))), 1fr)); grid-auto-rows: 1fr; gap: 12px; align-content: stretch; }
     .ts-row .shortcuts { grid-auto-rows: 1fr; }
     .ts-row.single { grid-template-columns: 1fr; }
     .ts-row.single .shortcuts { grid-template-columns: repeat(2, 1fr); }
@@ -854,11 +867,9 @@
     .lat-chip.on .rk, .lat-chip:hover .rk { background: var(--accent); color: var(--surface); }
 
 
-    /* three narrow tiles: the detail drops under the figure instead of trailing off */
-    @media (min-width: 761px) and (max-width: 1100px) {
-        .sc-v small { display: block; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .sc-v .sep { display: none; }
-    }
+    /* the detail sits under the figure (it trailed off on one line in narrow tiles) */
+    .sc-v small { display: block; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sc-v .sep { display: none; }
     /* laptop widths: the metric tabs get narrow, so the value drops its "of 16 GB" and shrinks a step */
     @media (max-width: 1200px) {
         .mt-value { font-size: 20px; }

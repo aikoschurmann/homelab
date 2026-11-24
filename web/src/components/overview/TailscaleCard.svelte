@@ -120,6 +120,10 @@
     .narrow .d-cols { grid-template-columns: 1fr; }
     .narrow .d-col + .d-col { border-left: none; border-top: 1px solid var(--border); }
     .narrow .d-hint { display: none; }
+    /* (and the traffic wraps rather than run out of the card; the two lists keep their own height) */
+    .narrow .io { flex-wrap: wrap; gap: 4px 16px; white-space: normal; }
+    .narrow .io small { flex-basis: 100%; }
+    .narrow .d-cols { align-content: start; }
 
     /* the traffic group drops to its own line before things get tight */
     @media (max-width: 1100px) {

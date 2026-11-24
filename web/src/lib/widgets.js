@@ -21,6 +21,9 @@ export const OVERVIEW_WIDGETS = [
 export const AVATAR_LOOKS = [['visor', 'Visor'], ['dots', 'Dots'], ['pixel', 'Pixel'], ['cat', 'Cat']];
 // sections added since that only show up when you add them (not dropped onto every page)
 const OPT_IN = ['rack', 'text', 'avatar'];
+// small sections that sit on the widgets' grid of cells (a size and a cell of their own), so
+// they go next to a gauge, a graph or each other
+export const GRID_SECTIONS = ['avatar', 'text'];
 // pages the shortcuts section can link to; the Overview fills in each one's figure
 export const SHORTCUTS = [
     { id: 'databases', label: 'Databases' }, { id: 'terminal', label: 'Terminal' }, { id: 'backups', label: 'Backups' },
@@ -79,7 +82,10 @@ function norm(l = {}) {
     IDS.forEach((id, i) => {
         if (order.includes(id)) return;
         const before = IDS.slice(0, i).reverse().find(p => order.includes(p));
-        order.splice(before ? order.indexOf(before) + 1 : 0, 0, id);
+        // after it, and after the host cards that follow it (they belong under the cluster totals)
+        let at = before ? order.indexOf(before) + 1 : 0;
+        while (at < order.length && (order[at] === 'host' || /^[hv]:/.test(order[at]))) at++;
+        order.splice(at, 0, id);
     });
     return { order, hidden: [...(l.hidden || []).filter(id => IDS.includes(id) && !optIn.includes(id)), ...optIn], hidden_hosts: l.hidden_hosts || [],
         hidden_tiles: l.hidden_tiles || [], tile_order: tileOrder(l.tile_order), tile_joins: tileJoins(l.tile_joins), totals_cols: COLS.includes(l.totals_cols) ? l.totals_cols : 'auto',

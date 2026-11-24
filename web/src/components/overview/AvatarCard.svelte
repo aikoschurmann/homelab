@@ -76,7 +76,9 @@
         background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 8px); }
     .sq.worried { --c: var(--red); }
     .sq.sleep { --c: var(--text-secondary); }
-    svg { width: 100px; height: 100px; overflow: visible; }
+    /* the face grows with its square (Small or Large on the grid): about 60% of its shorter side */
+    .sq { container-type: size; }
+    svg { width: 60cqmin; height: 60cqmin; max-width: 100%; max-height: 100%; overflow: visible; }
     .visor { fill: var(--bg); stroke: var(--border-strong); stroke-width: 1.5; }
     .ear { fill: var(--bg); stroke: var(--border-strong); stroke-width: 1.5; stroke-linejoin: round; }
     .scan { stroke: var(--highlight-5); stroke-width: 1; }

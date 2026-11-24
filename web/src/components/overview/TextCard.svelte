@@ -1,6 +1,6 @@
 <script>
     // Some text of your own: a title and a few lines (links become clickable). Written on the
-    // card itself while customizing; Large shows it as a big line, for a motto or a reminder.
+    // card itself while customizing (Normal / Large sits in its Customize toolbar); Large shows it as a big line, for a motto or a reminder.
     export let cfg = {};
     export let editing = false;
     export let onChange = () => {};
@@ -16,8 +16,7 @@
     {#if editing}
         <div class="live-edit" data-nodrag>
             <input class="ui-input" placeholder="Title (optional)" maxlength="80" value={title} on:input={(e) => onChange({ title: e.currentTarget.value })} />
-            <textarea class="ui-input area" placeholder="Write something…" rows="3" maxlength="2000" value={body} on:input={(e) => onChange({ body: e.currentTarget.value })}></textarea>
-            <div class="ui-seg"><button type="button" class:on={!big} on:click={() => onChange({ size: 'normal' })}>Normal</button><button type="button" class:on={big} on:click={() => onChange({ size: 'big' })}>Large</button></div>
+            <textarea class="ui-input area" class:big placeholder="Write something…" rows="3" maxlength="2000" value={body} on:input={(e) => onChange({ body: e.currentTarget.value })}></textarea>
         </div>
     {:else if title || body}
         {#if title}<div class="ui-card-head"><h2 class="ui-card-title">{title}</h2></div>{/if}
@@ -34,8 +33,10 @@
     .ui-card-head + .txt { border-top: 1px solid var(--border); }
     .txt.top { padding-top: 16px; }
     .txt.empty { color: var(--text-secondary); }
-    .big .txt { align-items: center; font-size: 20px; line-height: 1.4; font-weight: 600; letter-spacing: -0.01em; }
+    .big .txt { font-size: 20px; line-height: 1.4; font-weight: 600; letter-spacing: -0.01em; }
     @media (max-width: 640px) { .txt, .live-edit { padding-left: 14px; padding-right: 14px; } }
     .live-edit { display: flex; flex-direction: column; gap: 8px; padding: 16px 20px; pointer-events: auto; }
     .area { height: auto; min-height: 72px; padding: 8px 10px; line-height: 1.5; resize: vertical; }
+    /* while editing, the box already shows the text as it will look (Large: the big line) */
+    .area.big { font-size: 20px; line-height: 1.4; font-weight: 600; letter-spacing: -0.01em; }
 </style>

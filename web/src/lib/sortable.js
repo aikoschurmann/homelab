@@ -101,27 +101,34 @@ export function sortable(node, opts) {
     // the cell under it and the others move out of its way (no reordering); away from the grid,
     // it is an item of the list again (and the grid goes back as it was).
     let activeGrid = null, lastCell = '', offX = 0, offY = 0;
-    function gridTarget(px, py) {
+    // a cell counts once the pointer has rested on it a moment (as a list place does), so the
+    // others don't jump on every cell passed on the way; letting go takes the cell at once
+    let gridCand = '', gridTimer = 0;
+    function gridTarget(px, py, now = false) {
         const g = el?.parentElement?.closest('[data-cells]');
         if (!g || !g.__moveTo || !el.dataset.span) return undefined;
         const b = g.getBoundingClientRect();
         const n = +g.dataset.cells, gap = parseFloat(getComputedStyle(g).columnGap) || 0, unit = (b.width - (n - 1) * gap) / n;
         // over the grid, or just under it (a new row)
         if (px < b.left - unit / 2 || px > b.right + unit / 2 || py < b.top - unit / 2 || py > b.bottom + unit * 0.6) {
+            clearTimeout(gridTimer); gridCand = '';
             if (activeGrid) { activeGrid.__moveTo(null); activeGrid = null; lastCell = ''; }
             return undefined;
         }
         const [w] = el.dataset.span.split(' ').map(Number);
         // the cell its top-left corner is nearest, where it was picked up kept under the pointer
         const x = Math.max(0, Math.min(n - Math.min(w, n), Math.round((px - offX - b.left) / (unit + gap))));
-        const y = Math.max(0, Math.round((py - offY - b.top) / (unit + gap)));
+        const y = g.__rowAt ? g.__rowAt(py - offY) : Math.max(0, Math.round((py - offY - b.top) / (unit + gap)));
         const key = x + ',' + y;
-        if (key !== lastCell) { lastCell = key; activeGrid = g; g.__moveTo(el.dataset.mid, x, y); }
+        const go = () => { gridCand = ''; if (!el) return; lastCell = key; activeGrid = g; g.__moveTo(el.dataset.mid, x, y); };
+        if (key === lastCell) { clearTimeout(gridTimer); gridCand = ''; }
+        else if (now) { clearTimeout(gridTimer); go(); }
+        else if (key !== gridCand) { gridCand = key; clearTimeout(gridTimer); gridTimer = setTimeout(go, DWELL); }
         return null;
     }
 
-    function targetAt(px, py) {
-        const gt = gridTarget(px, py);
+    function targetAt(px, py, now = false) {
+        const gt = gridTarget(px, py, now);
         if (gt !== undefined) return gt;
         if (performance.now() < settleAt) return null;
         const rs = rows().filter(r => r !== el);
@@ -257,8 +264,9 @@ export function sortable(node, opts) {
         if (el) {
             // let go before the pause was up: where the pointer is still counts
             clearTimeout(candTimer); cand = null;
-            const t = targetAt(px, py);
+            const t = targetAt(px, py, true);
             if (t && t.ids.join() !== cur.join()) apply(t);
+            clearTimeout(gridTimer); gridCand = '';
             if (activeGrid) { activeGrid.__commit(); activeGrid = null; lastCell = ''; }
             clone?.remove(); clone = null;
             placeholder(el, false);

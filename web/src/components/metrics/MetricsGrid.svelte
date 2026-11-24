@@ -2,15 +2,19 @@
     import { onMount } from 'svelte';
     import { ChevronLeft, ChevronRight, ChevronDown, Check, Trash2, GripVertical, ChartLine, ChartBarStacked, Gauge } from 'lucide-svelte';
     import MetricCard from './MetricCard.svelte';
-    import { layout, toggleJoin, joinKey, keepJoinsIf } from '../../lib/widgets.js';
+    import { layout, toggleJoin, joinKey, keepJoinsIf, baseOf, setCfg } from '../../lib/widgets.js';
     import { tick, beforeUpdate, afterUpdate } from 'svelte';
-    import { mlayout, catalog, loadCatalog, removeCard, setCard, splitGauges, cellOf, gridLayout, pushLayout, setPositions, TYPES, SIZES, SIZE_NAMES, NET, RANGES, sizeFor, kindsFor } from '../../lib/metrics.js';
+    import { mlayout, catalog, loadCatalog, removeCard, setCard, splitGauges, cellOf, gridLayout, pushLayout, swapLayout, setPositions, TYPES, SIZES, sizeName, widthsFor, heightsFor, WIDTH_NAMES, heightName, dimsOf, NET, RANGES, sizeFor, kindsFor } from '../../lib/metrics.js';
 
     // A run of metric widgets that sit next to each other among the Overview's sections
     // (each widget is its own item in the Overview's order, 'm:<id>'), laid out in one grid.
     // editing (the Overview's Customize): each widget is a row of the editor's drag list,
     // with its settings and tools in a bar on its top edge, as a section's are (no dialog).
-    export let ids = [];                // the widgets of this run, in order
+    export let ids = [];                // the items of this run, in order: 'm:<id>' widgets and small sections ('avatar', 'text#k3x')
+    export let sec = null;              // snippet drawing a section (the Overview's)
+    export let tools = null;            // editing: snippet with a section's own settings for its bar
+    export let onRemove = () => {};     // editing: take a section off the page
+    export let nameOf = (t) => t;       // a section's or card's name (its bar's titles)
     export let editing = false;
     export let nOf = () => 0;           // editing: a widget's place in the editor's list
     export let total = 0;               // editing: how many items the list has
@@ -67,21 +71,46 @@
         return () => clearInterval(t);
     });
 
-    $: cards = ids.map(i => $mlayout.cards.find(c => c.id === i)).filter(Boolean);
+    // a section on the grid looks like a widget to the layout: its size and cell are kept in its cfg
+    const SEC_SIZE = { avatar: 's', text: 'm' };
+    // host and machine cards: a width of their own, one row that grows to fit what they hold
+    // (the rest of the sections, rack, totals and so on, the same way: Half if it was a half-width one)
+    // Auto: cells per card so as many fit as can at 380px or more each
+    $: fitCols = Math.ceil(cell.n / Math.max(1, Math.floor((gw + gap) / (380 + gap))));
+    const cardKind = (t) => t.startsWith('h:') ? 'host' : t.startsWith('v:') ? 'machine' : null;
+    // every item: a width (wk) and a height (hk: cells for a widget, avatar or text; 'auto' for cards
+    // and sections, as tall as what they show)
+    const secItem = (t, type, old, extra = {}) => { const g = $layout.cfg[t] || {}; return { id: t, section: true, type, pos: g.pos, fitCols, ...dimsOf(type, g.w, g.h, old), ...extra }; };
+    // (cell named here so this runs after it: secItem reads it)
+    $: cards = cell && ids.map(t => {
+        if (t.startsWith('m:')) { const c = $mlayout.cards.find(c => c.id === t.slice(2)); return c && { ...c, ...dimsOf(c.type, c.w, c.h, c.width) }; }
+        const g = $layout.cfg[t] || {};
+        if (cardKind(t)) return secItem(t, cardKind(t), g.cell || 'auto', { auto: true });
+        if (SEC_SIZE[baseOf(t)]) return secItem(t, baseOf(t), g.cell || SEC_SIZE[baseOf(t)]);
+        // (the old all-hosts section is not a host card)
+        return secItem(t, baseOf(t) === 'host' ? 'hostlist' : baseOf(t), g.cell || ($layout.widths[t] === 'half' ? 'half' : 'full'), { auto: true });
+    }).filter(Boolean);
+    const tokOf = (c) => c.section ? c.id : 'm:' + c.id;
+    function setDim(c, patch) { if (c.section) setCfg(c.id, patch); else setCard(c.id, patch); }
+    function remove(c) { if (c.section) onRemove(c.id); else removeCard(c.id); }
     $: $mlayout, splitGauges($catalog);
     // a grid of square cells: how many to a row and how big, from the grid's own width
     let gw = 1100, gridEl, gap = 16;
     $: gw, gridEl && (gap = parseFloat(getComputedStyle(gridEl).columnGap) || 0);
     $: cell = cellOf(gw, gap);
+    // (a row past the last one, for the drag: a cell tall)
+    $: rowH = cell.unit;
     // where each widget sits (cells): kept where it was put; while one is dragged, the others
     // moving out of its way (worked out from the layout as it was when the drag began)
     $: base = gridLayout(cards, cell.n);
     let preview = null, snap = null;
     $: at = preview || base;
-    const place = (p) => `grid-column: ${p.x + 1} / span ${p.w}; grid-row: ${p.y + 1} / span ${p.h}`;
+    // a widget is at least its cells tall; a card or section as tall as what it shows (its row as
+    // tall as the tallest in it, and everything in the row stretches to that)
+    const place = (p, fit = false) => `grid-column: ${p.x + 1} / span ${p.w}; grid-row: ${p.y + 1} / span ${p.h}` + (fit ? '' : `; min-height: ${Math.round(cell.unit * p.h + gap * (p.h - 1))}px`);
     // called by the drag (lib/sortable.js): the widget is over cell (x, y); null: it left the grid
     function moveTo(mid, x, y) {
-        if (mid == null) { preview = null; snap = null; return; }
+        if (mid == null) { preview = null; snap = null; rowCache = null; return; }
         if (!snap) snap = base;
         if (!snap[mid]) return;
         preview = pushLayout(snap, mid, x, y, cell.n);
@@ -91,17 +120,32 @@
     function commit() {
         if (preview) {
             const p = preview;
-            setPositions(cell.n, p);
-            arrange(Object.entries(p).sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x).map(([id]) => 'm:' + id));
+            const secs = new Set(cards.filter(c => c.section).map(c => c.id));
+            setPositions(cell.n, Object.fromEntries(Object.entries(p).filter(([k]) => !secs.has(k))));
+            for (const k of secs) if (p[k]) setCfg(k, { pos: { ...($layout.cfg[k]?.pos || {}), [cell.n]: { x: p[k].x, y: p[k].y } } });
+            arrange(Object.entries(p).sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x).map(([id]) => secs.has(id) ? id : 'm:' + id));
             // a merge stays only between two widgets still touching on one row, as tall
             const touch = (a, b) => a && b && a.y === b.y && a.h === b.h && a.x + a.w === b.x;
             keepJoinsIf('metrics', (a, b) => !(a in p && b in p) || touch(p[a], p[b]) || touch(p[b], p[a]));
         }
-        preview = null; snap = null;
+        preview = null; snap = null; rowCache = null;
     }
     // the arrows on a widget: one cell left or right
-    function nudge(mid, d) { snap = base; const p = base[mid]; moveTo(mid, p.x + d * p.w, p.y); commit(); }
-    $: if (gridEl) { gridEl.__moveTo = moveTo; gridEl.__commit = commit; }
+    // the arrows: trade places with the item before / after it (reading order, across rows)
+    function nudge(mid, d) { const p = swapLayout(base, mid, d, cell.n); if (p) { preview = p; commit(); } }
+    $: readOrder = Object.entries(at).sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x).map(([k]) => k);
+    // the row under a point (rows grow to fit a host card, so not all are one cell tall)
+    // Measured once when a drag starts and kept until it ends: the preview reflows the rows (a
+    // section's row is another height than a host cards' one), and measuring them again made the
+    // target jump back and forth between rows.
+    let rowCache = null;
+    function rowAt(py) {
+        const rows = rowCache ||= getComputedStyle(gridEl).gridTemplateRows.split(' ').map(parseFloat).filter(x => !isNaN(x));
+        let y = gridEl.getBoundingClientRect().top;
+        for (let i = 0; i < rows.length; i++) { if (py < y + rows[i] / 2 + gap / 2) return i; y += rows[i] + gap; }
+        return rows.length + Math.max(0, Math.round((py - y) / (rowH + gap)));
+    }
+    $: if (gridEl) { gridEl.__moveTo = moveTo; gridEl.__commit = commit; gridEl.__rowAt = rowAt; }
     // while customizing, widgets that move glide to their new cell (as Apple's do)
     let before = null;
     beforeUpdate(() => { before = editing && gridEl ? new Map([...gridEl.children].filter(e => e.dataset.mid).map(e => [e, e.getBoundingClientRect()])) : null; });
@@ -132,46 +176,51 @@
     $: cards, cell, gap, at, measure();
     // merged with the one before / after it
     $: joins = $layout.tile_joins.metrics;
-    $: jl = (k) => k > 0 && beside[cards[k].id] && joins.includes(joinKey(cards[k - 1].id, cards[k].id));
+    const joinable = (k) => k > 0 && !cards[k].section && !cards[k - 1].section && beside[cards[k].id];
+    $: jl = (k) => joinable(k) && joins.includes(joinKey(cards[k - 1].id, cards[k].id));
     $: jr = (k) => k < cards.length - 1 && jl(k + 1);
-    $: labelOf = (c) => c.title || $catalog?.metrics.find(m => m.key === c.metric)?.label || c.metric;
+    $: labelOf = (c) => c.section ? nameOf(c.id) : c.title || $catalog?.metrics.find(m => m.key === c.metric)?.label || c.metric;
 </script>
 
-<div class="mgrid" class:canvas={editing} bind:clientWidth={gw} bind:this={gridEl} data-cells={cell.n} style="grid-template-columns: repeat({cell.n}, minmax(0, 1fr)); grid-auto-rows: {cell.unit}px">
+<div class="mgrid" class:canvas={editing} bind:clientWidth={gw} bind:this={gridEl} data-cells={cell.n} style="grid-template-columns: repeat({cell.n}, minmax(0, 1fr)); grid-auto-rows: auto">
     {#each cards as c, k (c.id)}
         {#if editing}
-            {@const n = nOf('m:' + c.id)}
-            <div class="slot ed" class:held={menu?.id === c.id} class:tj-l={jl(k)} class:tj-r={jr(k)} style={at[c.id] ? place(at[c.id]) : ''} data-mid={c.id} data-span="{at[c.id]?.w} {at[c.id]?.h}" data-id={'m:' + c.id} data-n={n} data-handle>
-                <div class="ec"><MetricCard card={c} range={$mlayout.range} cat={$catalog} ext={((jl(k) ? 1 : 0) + (jr(k) ? 1 : 0)) * gap / 2} /></div>
+            {@const n = nOf(tokOf(c))}
+            <div class="slot ed" class:fit={c.auto} class:held={menu?.id === c.id} class:tj-l={jl(k)} class:tj-r={jr(k)} style={at[c.id] ? place(at[c.id], c.auto) : ''} data-mid={c.id} data-span="{at[c.id]?.w} {at[c.id]?.h}" data-id={tokOf(c)} data-n={n} data-handle>
+                <div class="ec" data-sort-root>{#if c.section}{@render sec?.(c.id, true)}{:else}<MetricCard card={c} range={$mlayout.range} cat={$catalog} ext={((jl(k) ? 1 : 0) + (jr(k) ? 1 : 0)) * gap / 2} />{/if}</div>
                 <div class="tb" style={barPos(at[c.id])}>
                     <span class="grip" title="Drag to move {labelOf(c)}"><GripVertical size={14} /></span>
-                    {#if kindsFor(metaOf(c)).length > 1}
+                    {#if c.section && tools}<i></i>{@render tools(c.id)}{/if}
+                    {#if !c.section && kindsFor(metaOf(c)).length > 1}
                         <i></i><span class="grp" data-nodrag role="group" aria-label="Kind">{#each TYPES.filter(([t]) => kindsFor(metaOf(c)).includes(t)) as [t, l] (t)}<button type="button" class="ic" class:on={c.type === t} aria-pressed={c.type === t} title={l} on:click={() => setKind(c, t)}><svelte:component this={KIND_ICON[t]} size={14} /></button>{/each}</span>
                     {/if}
-                    {#if (SIZES[c.type] || []).length > 1}
-                        <i></i><button type="button" class="dd" class:on={menu?.id === c.id && menu.kind === 'size'} data-nodrag title="Size" on:click|stopPropagation={(e) => openMenu(e, c, 'size')}>{SIZE_NAMES[sizeFor(c.type, c.width)]}<ChevronDown size={12} /></button>
+                    {#if widthsFor(c.type).length > 1}
+                        <i></i><button type="button" class="dd" class:on={menu?.id === c.id && menu.kind === 'w'} data-nodrag title="Width" on:click|stopPropagation={(e) => openMenu(e, c, 'w')}>{WIDTH_NAMES[c.wk]}<ChevronDown size={12} /></button>
                     {/if}
-                    {#if availOf(c).length > 1}
+                    {#if heightsFor(c.type, c.wk).length > 1}
+                        <button type="button" class="dd" class:on={menu?.id === c.id && menu.kind === 'h'} data-nodrag title="Height" on:click|stopPropagation={(e) => openMenu(e, c, 'h')}>{heightName(c.hk)}<ChevronDown size={12} /></button>
+                    {/if}
+                    {#if !c.section && availOf(c).length > 1}
                         <i></i><button type="button" class="dd" class:on={menu?.id === c.id && menu.kind === 'hosts'} data-nodrag title="Hosts" on:click|stopPropagation={(e) => openMenu(e, c, 'hosts')}>{hostsLabel(c)}<ChevronDown size={12} /></button>
                     {/if}
-                    {#if c.type !== 'gauge'}
+                    {#if !c.section && c.type !== 'gauge'}
                         <i></i><button type="button" class="dd" class:on={menu?.id === c.id && menu.kind === 'range'} data-nodrag title="Time range" on:click|stopPropagation={(e) => openMenu(e, c, 'range')}>{rangeLabel(c.range || $mlayout.range)}<ChevronDown size={12} /></button>
                     {/if}
                     <i></i>
                     <span class="grp" data-nodrag>
-                        {#if c.type !== 'gauge' && at[c.id] && at[c.id].w < cell.n}
-                            <button class="ic" title="Move left" disabled={!at[c.id]?.x} on:click={() => nudge(c.id, -1)}><ChevronLeft size={14} /></button>
-                            <button class="ic" title="Move right" disabled={at[c.id] && at[c.id].x + at[c.id].w >= cell.n} on:click={() => nudge(c.id, 1)}><ChevronRight size={14} /></button>
+                        {#if cards.length > 1}
+                            <button class="ic" title="Move earlier" disabled={readOrder[0] === c.id} on:click={() => nudge(c.id, -1)}><ChevronLeft size={14} /></button>
+                            <button class="ic" title="Move later" disabled={readOrder.at(-1) === c.id} on:click={() => nudge(c.id, 1)}><ChevronRight size={14} /></button>
                         {/if}
-                        <button class="ic del" title="Remove {labelOf(c)}" on:click={() => removeCard(c.id)}><Trash2 size={13} /></button>
+                        <button class="ic del" title="Remove {labelOf(c)}" on:click={() => remove(c)}><Trash2 size={13} /></button>
                     </span>
                 </div>
-                {#if k > 0 && beside[c.id]}
+                {#if joinable(k)}
                     <button type="button" class="tjb" data-nodrag title={jl(k) ? 'Split into two cards' : 'Merge into one card'} aria-label={jl(k) ? 'Split into two cards' : 'Merge into one card'} on:click|stopPropagation={() => toggleJoin('metrics', cards[k - 1].id, c.id)}></button>
                 {/if}
             </div>
         {:else}
-            <div class="slot" class:tj-l={jl(k)} class:tj-r={jr(k)} data-mid={c.id} style={at[c.id] ? place(at[c.id]) : ''}><MetricCard card={c} range={$mlayout.range} cat={$catalog} ext={((jl(k) ? 1 : 0) + (jr(k) ? 1 : 0)) * gap / 2} editable /></div>
+            <div class="slot" class:fit={c.auto} class:tj-l={jl(k)} class:tj-r={jr(k)} data-mid={c.id} style={at[c.id] ? place(at[c.id], c.auto) : ''}>{#if c.section}{@render sec?.(c.id, true)}{:else}<MetricCard card={c} range={$mlayout.range} cat={$catalog} ext={((jl(k) ? 1 : 0) + (jr(k) ? 1 : 0)) * gap / 2} editable />{/if}</div>
         {/if}
     {/each}
 </div>
@@ -179,8 +228,10 @@
 <svelte:window on:click={() => menu = null} on:scroll|capture={() => menu = null} on:resize={() => menu = null} on:keydown={(e) => e.key === 'Escape' && (menu = null)} />
 {#if menu && mc}
     <div class="mmenu" use:portal style="top: {menu.top}px; left: {menu.left}px" role="menu" tabindex="-1" on:click|stopPropagation on:keydown={() => {}}>
-        {#if menu.kind === 'size'}
-            {#each SIZES[mc.type] as [z, l] (z)}<button role="menuitemradio" aria-checked={sizeFor(mc.type, mc.width) === z} on:click={() => { setCard(mc.id, { width: z }); menu = null; }}><span>{l}</span>{#if sizeFor(mc.type, mc.width) === z}<Check size={13} />{/if}</button>{/each}
+        {#if menu.kind === 'w'}
+            {#each widthsFor(mc.type) as z (z)}<button role="menuitemradio" aria-checked={mc.wk === z} on:click={() => { setDim(mc, { w: z, h: heightsFor(mc.type, z).includes(mc.hk) ? mc.hk : heightsFor(mc.type, z)[0] }); menu = null; }}><span>{WIDTH_NAMES[z]}</span>{#if mc.wk === z}<Check size={13} />{/if}</button>{/each}
+        {:else if menu.kind === 'h'}
+            {#each heightsFor(mc.type, mc.wk) as z (z)}<button role="menuitemradio" aria-checked={mc.hk === z} on:click={() => { setDim(mc, { h: z }); menu = null; }}><span>{heightName(z)}</span>{#if mc.hk === z}<Check size={13} />{/if}</button>{/each}
         {:else if menu.kind === 'range'}
             {#each RANGES as [r, l] (r)}<button role="menuitemradio" aria-checked={(mc.range || $mlayout.range) === r} on:click={() => { setCard(mc.id, { range: r }); menu = null; }}><span>{l}</span>{#if (mc.range || $mlayout.range) === r}<Check size={13} />{/if}</button>{/each}
         {:else}
@@ -197,6 +248,26 @@
     .mgrid { --g: 16px; display: grid; gap: var(--g); align-items: stretch; }
     .slot { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
     .slot > :global(*) { flex: 1; min-height: 0; }
+    /* a widget is exactly its cells (min-height from the script); a card or section (.fit) sets its
+       row's height by what it shows, and everything in the row stretches to the tallest */
+    .slot:not(.fit) { contain: size; }
+    /* a row is as tall as its tallest item (a row of short sections stays short); everything in
+       it fills that height, so the avatar or a text card beside a host card or the rack matches it */
+    /* a section on the grid fills its cells exactly (the avatar's square, a text card) */
+    .slot :global(.msr) { display: flex; flex-direction: column; min-height: 0; }
+    .slot :global(.msr > *) { flex: 1; min-height: 0; }
+    .slot :global(.sq) { width: auto; min-height: 0; }
+    .slot :global(.note) { overflow: hidden; }
+    .ed :global(.sq), .ed :global(.note) { border-color: transparent; }
+    /* a host or machine card fills its cells; its parts keep their height, spread top to bottom */
+    .slot :global(.emb), .slot :global(.ui-cardgrid) { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 0; }
+    /* the cluster's tiles share the section's height (each row of tiles as tall) */
+    .slot :global(#sec-totals) { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .slot :global(.ui-summary.cluster) { flex: 1; grid-auto-rows: 1fr; }
+    .slot :global(.mcard) { flex: 1; justify-content: space-between; }
+    /* host and machine cards on the Overview: no addresses, at any width */
+    .slot :global(.mcard .addr) { display: none; }
+    .ed :global(.mcard) { border-color: transparent; }
     /* merged with a neighbour: one card, a line between (the slot itself carries .tj-l/.tj-r;
        the card inside loses its corners and left border) */
     .slot:global(.tj-l) { border-left: none !important; }
@@ -230,6 +301,8 @@
     .ed:global(.dragging) .tb { opacity: 0; }
     @media (hover: none) { .tb { opacity: 1; transform: translateY(-50%); pointer-events: auto; } }
     .tb i { width: 1px; height: 14px; margin: 0 3px; background: var(--border-strong); }
+    /* a group with nothing in it (web apps has no settings) leaves no empty gap between lines */
+    .tb i + i { display: none; }
     .grp { display: flex; align-items: center; gap: 1px; }
     .grip { width: 20px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: grab; }
     .tb button { height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 6px; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
@@ -239,6 +312,11 @@
     .tb .ic.del:hover { color: var(--red); }
     /* a toggle: what's picked in plain text on a fill, the rest muted (as a section's) */
     .tb .ic.on { background: var(--highlight-15); color: var(--text-primary); }
+    /* a section's own toggles (from the Overview's snippet) look like the rest of the bar */
+    .tb :global(.grp) { display: flex; align-items: center; gap: 1px; }
+    .tb :global(.tg) { height: 24px; padding: 0 8px; display: flex; align-items: center; border-radius: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
+    .tb :global(.tg:hover) { background: var(--highlight-10); color: var(--text-primary); }
+    .tb :global(.tg.on) { background: var(--highlight-15); color: var(--text-primary); font-weight: 500; }
     .tb { box-sizing: border-box; }
     .ed.held .tb { opacity: 1; transform: translateY(-50%); pointer-events: auto; z-index: 4; }
     .tb .dd { gap: 3px; padding: 0 5px 0 8px; font-size: 12px; color: var(--text-primary); }
