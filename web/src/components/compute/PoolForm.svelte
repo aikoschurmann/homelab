@@ -96,14 +96,14 @@
             <span class="tot">{picked.length} picked{totalCores ? ` · ${totalCores} cores` : ''}</span></div>
         {#if loading}<div class="ui-card-body ui-dim">Reading the cluster…</div>
         {:else}
-            <div class="ui-tbl-wrap"><table class="ui-tbl">
+            <div class="ui-tbl-wrap"><table class="ui-tbl nodes">
                 <thead><tr><th class="shrink"></th><th>Node</th><th>Login</th><th class="c-sm">Processes</th></tr></thead>
                 <tbody>
                     {#each cands as c (c.id)}
                         {@const ck = checks[c.id]}
                         <tr class:off={!rows[c.id].on} class:vm={c.vm}>
                             <td><input type="checkbox" bind:checked={rows[c.id].on} aria-label="Use {c.name}" title={c.vm ? `Shares ${sharesWith(c)?.name || "its host"}'s cores: picking it takes ${sharesWith(c)?.name || "the host"} out` : null} on:change={() => exclusive(c)} /></td>
-                            <td><div class="cm"><span class="ic"><svelte:component this={icon(c)} size={15} /></span><div><b>{c.name}</b><div class="ui-dim sub">{[c.vm ? 'VM' : '', c.os, c.cores ? `${c.cores} cores` : '', c.vm && !c.tailnet ? `${SN} only` : '', c.online ? '' : (c.vm ? 'stopped' : 'offline')].filter(Boolean).join(' · ')}</div></div></div></td>
+                            <td><div class="cm"><span class="ic"><svelte:component this={icon(c)} size={15} /></span><div><b>{c.name}</b><div class="ui-dim sub">{[c.vm ? 'VM' : '', c.os, c.cores ? `${c.cores} ${c.cores === 1 ? 'core' : 'cores'}` : '', c.vm && !c.tailnet ? `${SN} only` : '', c.online ? '' : (c.vm ? 'stopped' : 'offline')].filter(Boolean).join(' · ')}</div></div></div></td>
                             <td>
                                 <div class="ssh">
                                     <input class="ui-input ui-mono sm" bind:value={rows[c.id].ssh} disabled={!rows[c.id].on} spellcheck="false" on:input={() => delete checks[c.id]} />
@@ -168,4 +168,20 @@
     .sel { width: 220px; }
     tr.vm .cm { padding-left: 22px; }
     .end { justify-content: flex-end; }
+    /* phone: each node is the name with its login (and processes) on a line under it, instead
+       of a table wider than the screen */
+    @media (max-width: 640px) {
+        .pf .ui-card-head { flex-wrap: wrap; }
+        .nodes thead { display: none; }
+        .nodes tbody tr { display: grid; grid-template-columns: auto 1fr auto; column-gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+        .nodes tbody tr:last-child { border-bottom: none; }
+        .nodes tbody td, .nodes tbody tr:first-child td { padding: 0; border: none; }
+        .nodes td:nth-child(1) { grid-row: span 2; padding-top: 6px; }
+        .nodes td:nth-child(2) { grid-column: 2 / -1; }
+        .nodes td:nth-child(3) { grid-column: 2; padding-top: 8px; }
+        .nodes td.c-sm { display: block; grid-column: 3; padding-top: 8px; }
+        .ssh { min-width: 0; }
+        .num { width: 64px; }
+        tr.vm .cm { padding-left: 0; }
+    }
 </style>

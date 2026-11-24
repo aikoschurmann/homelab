@@ -169,7 +169,7 @@
             {@const s = u(m)}
             <ResourceCard name={m.name} tag={m.name === data.dashboard_vm ? 'Dashboard' : null} sub="{imageLabel(m.image)} · {m.image?.arch}" on={running(m)} off={!running(m)} on:open={() => open(m.name)}
                 meters={[
-                    { k: 'CPU', p: s ? s.cpu : 0, color: 'var(--metric-cpu)', v: s ? s.cpu.toFixed(1) + '%' : '—', of: m.cpu ? `of ${m.cpu} cores` : 'of pool' },
+                    { k: 'CPU', p: s ? s.cpu : 0, color: 'var(--metric-cpu)', v: s ? s.cpu.toFixed(1) + '%' : '—', of: m.cpu ? `of ${m.cpu} ${m.cpu === 1 ? 'core' : 'cores'}` : 'of pool' },
                     { k: 'Memory', p: s ? pct(s.mem, s.memLimit) : 0, color: 'var(--metric-mem)', v: s ? fmtBytes(s.mem) : '—', of: m.memory_mib ? `of ${gbFromMib(m.memory_mib)}` : 'of pool' },
                     { k: 'Disk', v: m.disk_usage || '—', of: 'used' },
                 ]}
@@ -228,7 +228,7 @@
                                 <div class="use">
                                     <span class="num">{s ? s.cpu.toFixed(1) + '%' : '—'}</span>
                                     <div class="mini"><i style="width: {s ? s.cpu : 0}%; background: var(--metric-cpu)"></i></div>
-                                    <span class="sub">{m.cpu ? `of ${m.cpu} cores` : 'of pool'}</span>
+                                    <span class="sub">{m.cpu ? `of ${m.cpu} ${m.cpu === 1 ? 'core' : 'cores'}` : 'of pool'}</span>
                                 </div>
                             </td>
                             <td class="c-sm">
