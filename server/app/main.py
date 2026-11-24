@@ -1,4 +1,5 @@
 import os
+import sys
 from flask import Flask, jsonify, request
 from flask_sock import Sock
 
@@ -54,7 +55,11 @@ def create_app():
     def _loopback_allowed(ip, port):
         """OrbStack proxies containers' and machines' traffic to the Mac (host.docker.internal,
         host.orb.internal) through 127.0.0.1, so loopback alone proves nothing. Refuse
-        connections opened by OrbStack's helper; everything else really is on the Mac."""
+        connections opened by OrbStack's helper; everything else really is on the Mac.
+        Elsewhere (Linux) nothing proxies into loopback like that, and lsof often isn't
+        installed, so loopback is this computer."""
+        if sys.platform != 'darwin':
+            return True
         key = (ip, port)
         hit = _peer_cache.get(key)
         if hit and time.time() - hit[0] < 60:
