@@ -48,6 +48,10 @@
     import LiveChart from './ui/LiveChart.svelte';
     import AttentionRow from './overview/AttentionRow.svelte';
     import Tabs from './ui/Tabs.svelte';
+    import RackCard from './overview/RackCard.svelte';
+    import TextCard from './overview/TextCard.svelte';
+    import AvatarCard from './overview/AvatarCard.svelte';
+    import { setCfg, AVATAR_LOOKS } from '../lib/widgets.js';
     import MetricsGrid from './metrics/MetricsGrid.svelte';
 
     export let stats;
@@ -208,6 +212,15 @@
     const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
     const fmtDur = (sec) => { const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60); return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`; };
 
+    // ---- the avatar: how the cluster is doing, in a few figures -------------------------------
+    $: buddy = (() => {
+        const remote = ($hosts || []).filter(h => !h.mock);
+        const busiest = [{ name: SN, cpu: live.cpu }, ...remote.filter(h => h.online).map(h => ({ name: h.name, cpu: h.report?.cpu_pct }))]
+            .filter(x => x.cpu != null).sort((a, b) => b.cpu - a.cpu)[0];
+        return { online: 1 + remote.filter(h => h.online).length, total: 1 + remote.length, down: remote.filter(h => !h.online).map(h => h.name),
+            busy: busiest && busiest.cpu >= 75 ? busiest : null, top: busiest || null, updates: pendingUpdates, now: Math.floor(now / 60000) * 60000 };
+    })();
+
     // ---- tailscale, databases, tmux, endpoints ------------------------------------------
     $: peers = stats?.connections?.tailscale || [];
 
@@ -285,10 +298,18 @@
             // host cards next to each other sit side by side, as cards do
             if (id.startsWith('h:') || id.startsWith('v:')) { const last = out.at(-1); if (last?.hostrun) last.ids.push(id); else out.push({ key: id, hostrun: true, ids: [id] }); continue; }
             if (id === 'metrics') continue;
-            const half = $layout.widths[id] === 'half', last = out.at(-1);
-            if (half && narrow) { out.push({ key: id, half: false, ids: [id] }); continue; }
-            if (half && last?.half) last.ids.push(id);
-            else out.push({ key: id, half, ids: [id] });
+            // the avatar is a small square: it sits beside a half-width neighbour, as a half does
+            // (one beside it, even on narrower screens, where halves go full width)
+            const av = baseOf(id) === 'avatar', last = out.at(-1);
+            const half = $layout.widths[id] === 'half' || av;
+            if (narrow) {
+                if (av) out.push({ key: id, half: true, av: true, ids: [id] });
+                else if (last?.av && last.ids.length === 1) last.ids.push(id);
+                else out.push({ key: id, half: false, ids: [id] });
+                continue;
+            }
+            if (half && last?.half && (!(av || last.av) || last.ids.length === 1)) { last.ids.push(id); if (av) last.av = true; }
+            else out.push({ key: id, half, av, ids: [id] });
         }
         // a line of cards keeps its block while only the order inside it changes (a key from its
         // first item would rebuild it, the page shrinking for a moment and the scroll jumping)
@@ -364,7 +385,7 @@
     let secsEl, secsW = 1100;
     // put what was picked on the page: section (or a copy), a card, metric widget(s); its items
     function create(spec) {
-        if (spec.kind === 'section') { const t = fresh(spec.id); setWidthOf(t, spec.width); return [t]; }
+        if (spec.kind === 'section') { const t = fresh(spec.id); setWidthOf(t, spec.width); if (spec.cfg) setCfg(t, spec.cfg); return [t]; }
         if (spec.kind === 'host') return [fresh('h:' + spec.id)];
         if (spec.kind === 'machine') return [fresh('v:' + spec.id)];
         const each = spec.each?.length ? spec.each : null;
@@ -433,6 +454,8 @@
         }
     }
     const setWidthOf = (id, w) => setWidth(id, w);
+    // a pair with the avatar in it: the square keeps its size, the other takes the rest
+    const pairCols = (ids) => ids.some(t => baseOf(t) === 'avatar') ? `grid-template-columns: ${ids.map(t => baseOf(t) === 'avatar' ? 'auto' : 'minmax(0, 1fr)').join(' ')}${ids.every(t => baseOf(t) === 'avatar') ? '; justify-content: start' : ''}` : '';
     const openSettings = (id) => { setId = id; setOpen = true; };
     const done = () => goPage(pageId);
 
@@ -500,7 +523,7 @@
     {/if}
 
     <!-- the sections, in the order and with the cards picked under Customize -->
-    {#snippet section(tok)}
+    {#snippet section(tok, onPage = false, cfgOf = null)}
     {@const id = baseOf(tok)}
     <div class="msr" use:measureSection={`${id}:${$layout.widths[id] === 'half' && !narrow ? 'half' : 'full'}${id === 'totals' ? ':' + totRows : ''}`}>
     {#if id === 'webapps'}<WebAppsCard />
@@ -534,6 +557,9 @@
     {:else if id === 'compute'}<ComputeCard />
     {:else if id === 'uptime'}<UptimeCard />
     {:else if id === 'pihole'}<PiholeCard />
+    {:else if id === 'rack'}<RackCard arrakis={{ cpu: live.cpu, mem, disk, cores, net: live.net, up: upSince ? (now - upSince) / 1000 : null }} />
+    {:else if id === 'text'}<TextCard cfg={$layout.cfg[tok] || {}} editing={customizing && onPage} onChange={(p) => setCfg(tok, p)} />
+    {:else if id === 'avatar'}<AvatarCard cfg={cfgOf || $layout.cfg[tok] || {}} state={buddy} />
     {:else if id === 'machines'}<MachinesCard />
     {:else if id === 'api-latency'}
     <section class="ui-card" class:latn={latCardW < 760} id="sec-api-latency" bind:clientWidth={latCardW}>
@@ -620,7 +646,10 @@
                     {#if kind === 'totals' && colChoices(id).length > 2}
                         <i></i><span class="grp" data-nodrag role="group" aria-label="Tiles per row" title="Tiles per row">{#each colChoices(id) as c}<button type="button" class="tg" class:on={String($layout.totals_cols) === String(c)} on:click={() => setTotalsCols(c)}>{c === 'auto' ? 'Fit' : c}</button>{/each}</span>
                     {/if}
-                    {#if !isCard(id) && !narrow}
+                    {#if kind === 'avatar'}
+                        <i></i>{#if narrow}<select class="lk" data-nodrag aria-label="Look" value={$layout.cfg[id]?.look || 'visor'} on:change={(e) => setCfg(id, { look: e.currentTarget.value })}>{#each AVATAR_LOOKS as [k, l]}<option value={k}>{l}</option>{/each}</select>{:else}<span class="grp" data-nodrag role="group" aria-label="Look">{#each AVATAR_LOOKS as [k, l]}<button type="button" class="tg" class:on={($layout.cfg[id]?.look || 'visor') === k} on:click={() => setCfg(id, { look: k })}>{l}</button>{/each}</span>{/if}
+                    {/if}
+                    {#if !isCard(id) && !narrow && kind !== 'avatar'}
                         <i></i><span class="grp" data-nodrag role="group" aria-label="Width"><button type="button" class="tg" class:on={$layout.widths[id] !== 'half'} on:click={() => setWidth(id, 'full')}>Full</button><button type="button" class="tg" class:on={$layout.widths[id] === 'half'} on:click={() => setWidth(id, 'half')}>Half</button></span>
                     {/if}
                     <i></i>
@@ -633,9 +662,9 @@
                         <button class="ic del" title="Remove {nameOf(id)}" on:click={() => removeItem(id)}><Trash2 size={13} /></button>
                     </span>
                 </div>
-                <div class="ec" data-sort-root>{@render section(id)}</div>
+                <div class="ec" data-sort-root>{@render section(id, true)}</div>
             </div>
-        {:else}{@render section(id)}{/if}
+        {:else}{@render section(id, true)}{/if}
     {/snippet}
 
     <div class="secs" bind:this={secsEl} bind:clientWidth={secsW} use:sortable={{ onMove: (ids) => customizing && moveShown(ids) }}>
@@ -643,7 +672,7 @@
         {#if g.hostrun}<div class="ui-cardgrid hrun">{#each g.ids as id (id)}{@render item(id, 'h|' + g.key)}{/each}</div>
         {:else if g.metric}<MetricsGrid ids={g.ids.map(t => t.slice(2))} editing={customizing} nOf={(t) => shown.indexOf(t)} total={shown.length} arrange={reorderWithin} />
         {:else if g.half}
-            <div class="pair">{#each g.ids as id (id)}{@render item(id, 'p|' + g.key)}{/each}</div>
+            <div class="pair" style={pairCols(g.ids)}>{#each g.ids as id (id)}{@render item(id, 'p|' + g.key)}{/each}</div>
         {:else}{@render item(g.ids[0])}{/if}
     {/each}
     {#if customizing && !shown.length}<div class="ui-card ui-empty">Nothing on the page. Add sections and widgets with Add.</div>{/if}
@@ -700,7 +729,20 @@
     @media (hover: none) { .tb { opacity: 1; transform: translateY(-50%); pointer-events: auto; } }
     /* one line, always: wider than a half-width section, it runs past it from its outer edge */
     .pair > .ed:first-child .tb { right: auto; left: 12px; }
-    @media (max-width: 760px) { .tb, .pair > .ed:first-child .tb { left: 12px; right: 12px; width: auto; flex-wrap: wrap; } }
+    /* phone: the tools are a strip on the item's top, inside it (a floating bar on its edge ran over
+       the item above and out of narrow ones); one line, scrolled sideways when it doesn't fit */
+    @media (max-width: 760px) {
+        .tb, .pair > .ed:first-child .tb { position: static; order: -1; width: auto; max-width: 100%; box-sizing: border-box; opacity: 1; transform: none; pointer-events: auto; box-shadow: none;
+            justify-content: flex-start; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-bottom: 6px; padding: 3px; }
+        .tb::-webkit-scrollbar { display: none; }
+        .tb > :last-child { margin-left: auto; }
+        .tb button { height: 30px; }
+        .tb .ic { width: 32px; flex-shrink: 0; }
+        .tb .grip { display: none; }
+        .tb .grip + i { display: none; }
+        .ed { outline-offset: 4px; }
+    }
+    .tb .lk { height: 30px; padding: 0 6px; border-radius: 6px; border: none; background: var(--highlight-10); color: var(--text-primary); font: inherit; font-size: 12px; }
     .tb i { width: 1px; height: 14px; margin: 0 3px; background: var(--border-strong); }
     .grp { display: flex; align-items: center; gap: 1px; }
     .grip { width: 20px; height: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: grab; }

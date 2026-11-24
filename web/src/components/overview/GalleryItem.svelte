@@ -1,7 +1,7 @@
 <script>
     import { ChartSpline, Gauge as GaugeIcon, ChartBar } from 'lucide-svelte';
     import MetricCard from '../metrics/MetricCard.svelte';
-    import { SECTION_TILES, SHORTCUTS, COLS, layout, toggleTile, setTotalsCols, setShortcuts } from '../../lib/widgets.js';
+    import { SECTION_TILES, SHORTCUTS, COLS, AVATAR_LOOKS, layout, toggleTile, setTotalsCols, setShortcuts } from '../../lib/widgets.js';
     import { catalog, mlayout, kindsFor, SIZES, sizeOf, NET } from '../../lib/metrics.js';
 
     // One thing the Add gallery offers, as it will be on the page (dashed, as while customizing)
@@ -24,6 +24,7 @@
 
     // a section: what it shows (shared with the one on the page) and its width
     let secWidth = 'full';
+    let look = 'visor';   // the avatar: which character
     $: tileName = Object.fromEntries((SECTION_TILES[item.id] || []).map(t => [t.id, t.label]));
     $: tiles = item.type === 'section' && SECTION_TILES[item.id] ? ($layout.tile_order[item.id] || []) : [];
     $: picked = $layout.shortcuts;
@@ -52,7 +53,7 @@
     $: sizes = SIZES[kind] || [];
     $: if (vi >= sizes.length) vi = 0;
 
-    $: spec = item.type === 'section' ? { kind: 'section', id: item.id, width: secWidth }
+    $: spec = item.type === 'section' ? { kind: 'section', id: item.id, width: secWidth, ...(item.id === 'avatar' ? { cfg: { look } } : {}) }
         : item.type === 'host' || item.type === 'machine' ? { kind: item.type, id: cardId }
         : !meta ? null
         : (() => {
@@ -106,7 +107,7 @@
     <!-- (a metric widget carries its own name: no label over it) -->
     {#if item.type !== 'metric'}<div class="lb"><b>{item.label}</b>{#if item.desc}<span>{item.desc}</span>{/if}</div>{/if}
     <div class="ver" data-sort-root use:handover>
-        <div class="ui-tools tb" class:left={item.type === 'metric' || secWidth === 'half'}>
+        <div class="ui-tools tb" class:left={item.type === 'metric' || secWidth === 'half' || item.id === 'avatar'}>
             {#if item.type === 'section'}
                 {#if tiles.length}
                     <span class="grp" role="group" aria-label="Tiles shown">{#each tiles as t (t)}<button type="button" class:on={!$layout.hidden_tiles.includes(t)} aria-pressed={!$layout.hidden_tiles.includes(t)} title="{$layout.hidden_tiles.includes(t) ? 'Show' : 'Hide'} {tileName[t]}" on:click={() => toggleTile(t)}>{tileName[t]}</button>{/each}</span><i></i>
@@ -117,7 +118,11 @@
                 {#if item.id === 'shortcuts'}
                     <span class="grp" role="group" aria-label="Pages shown">{#each SHORTCUTS as x (x.id)}<button type="button" class:on={picked.includes(x.id)} aria-pressed={picked.includes(x.id)} title="{picked.includes(x.id) ? 'Hide' : 'Show'} {x.label}" on:click={() => toggleShortcut(x.id)}>{x.label}</button>{/each}</span><i></i>
                 {/if}
+                {#if item.id === 'avatar'}
+                <span class="grp" role="group" aria-label="Look">{#each AVATAR_LOOKS as [k, l]}<button type="button" class:on={look === k} on:click={() => look = k}>{l}</button>{/each}</span>
+                {:else}
                 <span class="grp" role="group" aria-label="Width"><button type="button" class:on={secWidth === 'full'} on:click={() => secWidth = 'full'}>Full</button><button type="button" class:on={secWidth === 'half'} on:click={() => secWidth = 'half'}>Half</button></span>
+                {/if}
             {:else if item.type === 'metric'}
                 <!-- compact, so it fits on the widget: the metric, hosts and size as menus, the kind as icons -->
                 {#if item.metrics?.length > 1}<select class="mk" bind:value={mkey} aria-label="Metric" title="Metric">{#each item.metrics as m (m.key)}<option value={m.key}>{m.label}</option>{/each}</select>{/if}
@@ -136,7 +141,7 @@
             <div class="pv" data-id="gal" data-handle use:scaled={{ w: realW(spec), h: spec.kind === 'metric' ? sizeOf(spec.card, pageW).h : 0, mh: minH, s: fitS }} role="button" tabindex="-1" title="Drag onto the page, or click to add at the end" on:pointerdown={down}>
                 <div class="pin">
                     {#if spec.kind === 'metric'}<MetricCard card={{ id: 'gal-' + meta.key, ...spec.card }} range={$mlayout.range} cat={$catalog} />
-                    {:else if preview}{@render preview(what)}{/if}
+                    {:else if preview}{@render preview(what, false, spec.cfg || null)}{/if}
                 </div>
             </div>
         {/key}

@@ -32,6 +32,9 @@
         'api-latency': 'How quickly the backend answers.',
         uptime: 'Your uptime checks at a glance.',
         pihole: 'Queries and blocking today.',
+        rack: 'Every host and machine as a unit in a rack, with live lights.',
+        text: 'A title and some lines of your own.',
+        avatar: 'A little companion whose mood follows the cluster.',
     };
     // everything that can be added, one after another (no list to pick from: each is shown, each
     // with its own tools), found by name
@@ -69,7 +72,7 @@
     // a card: as wide as in a row of cards (.ui-cardgrid: as many of at least 380px as fit, 16px apart)
     $: cardN = innerW <= 640 ? 1 : Math.max(1, Math.floor((pageW + 16) / 396));
     $: cardW = (pageW - 16 * (cardN - 1)) / cardN;
-    $: realW = (spec) => spec.kind === 'host' || spec.kind === 'machine' ? cardW : spec.kind === 'section' ? (spec.width === 'half' ? (pageW - 16) / 2 : pageW) : widthOf(spec.card, pageW);
+    $: realW = (spec) => spec.kind === 'host' || spec.kind === 'machine' ? cardW : spec.kind === 'section' ? (spec.id === 'avatar' ? 136 : spec.width === 'half' ? (pageW - 16) / 2 : pageW) : widthOf(spec.card, pageW);
 
     // press and move: a drag onto the page; press and let go: add at the end
     function press(e, spec, el) {

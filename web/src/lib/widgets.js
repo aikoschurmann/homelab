@@ -13,7 +13,14 @@ export const OVERVIEW_WIDGETS = [
     { id: 'api-latency', label: 'API latency' },
     { id: 'uptime', label: 'Uptime checks' },
     { id: 'pihole', label: 'Pi-hole' },
+    { id: 'rack', label: 'Rack' },
+    { id: 'text', label: 'Text' },
+    { id: 'avatar', label: 'Avatar' },
 ];
+// the avatar's faces
+export const AVATAR_LOOKS = [['visor', 'Visor'], ['dots', 'Dots'], ['pixel', 'Pixel'], ['cat', 'Cat']];
+// sections added since that only show up when you add them (not dropped onto every page)
+const OPT_IN = ['rack', 'text', 'avatar'];
 // pages the shortcuts section can link to; the Overview fills in each one's figure
 export const SHORTCUTS = [
     { id: 'databases', label: 'Databases' }, { id: 'terminal', label: 'Terminal' }, { id: 'backups', label: 'Backups' },
@@ -68,15 +75,18 @@ function norm(l = {}) {
     // items: a section ('tailscale', a copy 'tailscale#k3x'), a metric widget 'm:<id>', a host's card
     // 'h:<id>', a machine's card 'v:<name>' (cards and copies can be there more than once)
     const order = src.filter(id => IDS.includes(baseOf(id)) || /^[mhv]:/.test(id) || ['metrics', 'host', 'machines'].includes(id));
+    const optIn = OPT_IN.filter(id => !order.includes(id));
     IDS.forEach((id, i) => {
         if (order.includes(id)) return;
         const before = IDS.slice(0, i).reverse().find(p => order.includes(p));
         order.splice(before ? order.indexOf(before) + 1 : 0, 0, id);
     });
-    return { order, hidden: (l.hidden || []).filter(id => IDS.includes(id)), hidden_hosts: l.hidden_hosts || [],
+    return { order, hidden: [...(l.hidden || []).filter(id => IDS.includes(id) && !optIn.includes(id)), ...optIn], hidden_hosts: l.hidden_hosts || [],
         hidden_tiles: l.hidden_tiles || [], tile_order: tileOrder(l.tile_order), tile_joins: tileJoins(l.tile_joins), totals_cols: COLS.includes(l.totals_cols) ? l.totals_cols : 'auto',
         // sections at half width sit two to a row
         widths: Object.fromEntries(Object.entries(l.widths || {}).filter(([k, v]) => IDS.includes(baseOf(k)) && v === 'half')),
+        // what each text or avatar section says and looks like, by its item ('text', 'text#k3x')
+        cfg: Object.fromEntries(Object.entries(l.cfg && typeof l.cfg === 'object' ? l.cfg : {}).filter(([k, v]) => order.includes(k) && v && typeof v === 'object')),
         shortcuts: Array.isArray(l.shortcuts) ? l.shortcuts.filter(x => SC_IDS.includes(x)) : ['databases', 'terminal'] };
 }
 
@@ -204,6 +214,7 @@ export const keepJoinsIf = (kind, fn) => update(l => ({ ...l, tile_joins: { ...l
 export const setTileOrder = (kind, ids) => update(l => ({ ...l, tile_order: { ...l.tile_order, [kind]: [...ids, ...l.tile_order[kind].filter(x => !ids.includes(x))] } }));
 export const setTotalsCols = (v) => update(l => ({ ...l, totals_cols: v }));
 export const setWidth = (id, w) => update(l => ({ ...l, widths: { ...l.widths, [id]: w } }));
+export const setCfg = (tok, patch) => update(l => ({ ...l, cfg: { ...l.cfg, [tok]: { ...(l.cfg[tok] || {}), ...patch } } }));
 export const setShortcuts = (list) => update(l => ({ ...l, shortcuts: list }));
 export const setWidgetOrder = (order) => update(l => ({ ...l, order }));
 export const showAllWidgets = () => update(l => ({ ...l, hidden: [], hidden_hosts: [], hidden_tiles: [] }));
