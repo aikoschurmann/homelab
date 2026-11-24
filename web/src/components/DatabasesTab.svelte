@@ -35,6 +35,8 @@
         return +(b / 1024 ** i).toFixed(i >= 2 ? 1 : 0) + ' ' + ['B', 'KB', 'MB', 'GB', 'TB'][i];
     }
     const num = (n) => (n ?? 0).toLocaleString();
+    // phone: big counts short (1.8M), so the column stays narrow
+    const cpt = (n) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n ?? 0);
     const rowsOf = (db) => (db.tables || []).reduce((a, t) => a + Math.max(0, t.rows || 0), 0);
     const where = (d) => d.machine ? (d.host ? `${d.machine} on ${d.host_name}` : d.machine) : 'the Mac';
     const copiedAgo = (d, now) => d.snapshot ? 'copied ' + ago(new Date(d.snapshot.at * 1000).toISOString(), now) : 'not copied yet';
@@ -360,7 +362,7 @@
                                     </td>
                                     <td>{d.service}</td>
                                     <td class="num">{d.tables ? d.tables.length : '—'}</td>
-                                    <td class="num">{d.tables ? num(rowsOf(d)) : '—'}</td>
+                                    <td class="num" title={d.tables ? num(rowsOf(d)) + ' rows' : null}>{#if d.tables}<span class="full">{num(rowsOf(d))}</span><span class="cpt">{cpt(rowsOf(d))}</span>{:else}—{/if}</td>
                                     <td class="num">{size(d.size_bytes)}</td>
                                 </tr>
                             {/each}
@@ -387,6 +389,7 @@
     .dbs { table-layout: fixed; }
     .dbs td { overflow: hidden; text-overflow: ellipsis; }
     .w-by { width: 140px; } .w-n { width: 90px; } .w-r { width: 120px; } .w-s { width: 100px; }
+    .dbs .cpt { display: none; }
     .dbn { display: flex; align-items: center; gap: 12px; min-width: 0; }
     .dbm { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
     .dbm small { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -457,7 +460,8 @@
     @media (max-width: 760px) {
         .w-by { width: 0; } .dbs th:nth-child(2), .dbs td:nth-child(2) { padding: 0; font-size: 0; }
         .w-n { width: 0; } .dbs th:nth-child(3), .dbs td:nth-child(3) { padding: 0; font-size: 0; }
-        .w-r { width: 88px; } .w-s { width: 84px; }
+        .w-r { width: 72px; } .w-s { width: 84px; }
+        .dbs .full { display: none; } .dbs .cpt { display: inline; }
         .rowview > div { grid-template-columns: 1fr; gap: 2px; }
     }
     /* phone: cards inset 14px, so this lines up with the card's header */
