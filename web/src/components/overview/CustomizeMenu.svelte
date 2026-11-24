@@ -6,6 +6,8 @@
     import { hosts, hostOrder, saveHostOrder, byOrder } from '../../lib/hosts.js';
     import { sortable } from '../../lib/sortable.js';
     import { crumbLabels } from '../../lib/stores.js';
+    import { webLinks, pinnedLinks } from '../../lib/weblinks.js';
+    import { services } from '../../lib/services.js';
     crumbLabels.update(c => ({ ...c, customize: 'Customize' }));
 
     // Customize the Overview at #overview/customize: a wireframe of the page (layout and names,
@@ -71,6 +73,8 @@
         const ro = new ResizeObserver(set); ro.observe(node); set();
         return { update(n) { sz = n; set(); }, destroy() { ro.disconnect(); } };
     }
+    // the pinned web apps, by name (as the page's chips)
+    $: links = pinnedLinks($webLinks, $services).slice(0, 6);
     const scLabel = Object.fromEntries(SHORTCUTS.map(x => [x.id, x.label]));
     $: scLeft = SHORTCUTS.filter(x => !$layout.shortcuts.includes(x.id));
     const scMove = (k, d) => { const o = step($layout.shortcuts, k, d); if (o) setShortcuts(o); };
@@ -120,7 +124,7 @@
                             <div class="fc" use:fitHeight={id === 'totals' ? totSize($sectionSizes, $layout.widths.totals === 'half' && vw > 1000 ? 'half' : 'full') : ($sectionSizes[`${id}:${$layout.widths[id] === 'half' && vw > 1000 ? 'half' : 'full'}`] || $sectionSizes[`${id}:full`] || $sectionSizes[`${id}:half`])}>
 
                             {#if id === 'webapps'}
-                                <div class="wf card row"><span class="tx t">Web apps</span><b class="pill"></b><b class="pill"></b><b class="pill"></b><b class="pill ghost"></b></div>
+                                <div class="wf card row"><span class="tx t wa">Web apps</span>{#each links.length ? links : [{ name: 'App' }, { name: 'App' }] as l}<span class="pill"><b class="gl"></b><span class="tx">{l.name}</span></span>{/each}<span class="pill add"><Plus size={12} /></span></div>
                             {:else if id === 'attention'}
                                 {#if attShown.length}
                                     <div class="wf card split">{#each attShown as t (t.id)}<div class="cell">
@@ -235,6 +239,7 @@
     /* a preview spreads its contents over the section's real height instead of leaving a gap */
     .fc > :global(:first-child) { box-sizing: border-box; }
     .fc > :global(.wf.card) { justify-content: space-between; }
+    .fc > :global(.wf.card.row) { justify-content: flex-start; }
     .fc > :global(.tiles), .fc > :global(.hosts) { align-content: stretch; }
     .fc :global(.tile) { justify-content: space-evenly; }
     .fc :global(.hc) { display: flex; flex-direction: column; }
@@ -344,8 +349,12 @@
     .mr .bar { flex: 1; width: auto; }
     .days { display: block; height: 5px; background: repeating-linear-gradient(90deg, var(--accent) 0 calc(100% / 14 - 2px), transparent 0 calc(100% / 14)); border-radius: 2px; opacity: .8; }
     .wf.card.row { flex-direction: row; align-items: center; gap: 10px; }
-    .pill { flex: 0 1 90px; min-width: 24px; width: 90px; height: 24px; border-radius: 12px; border: 1px solid var(--border-strong); }
-    .pill.ghost { width: 24px; border-style: dashed; }
+    /* web app chips as on the page: globe, name, and the dashed add circle */
+    .wa { margin-right: 8px; }
+    .pill { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 13px 0 9px; border-radius: 15px; border: 1px solid var(--border-strong); min-width: 0; flex: 0 1 auto; }
+    .pill .tx { color: var(--text-primary); font-size: 12px; }
+    .gl { width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid var(--text-secondary); flex-shrink: 0; }
+    .pill.add { width: 30px; padding: 0; justify-content: center; border-style: dashed; color: var(--text-secondary); flex: none; }
     .wf.card.split { flex-direction: row; padding: 0; gap: 0; }
     .cell { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; min-width: 0; }
     .cell + .cell { border-left: 1px solid var(--border); }

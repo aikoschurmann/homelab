@@ -207,35 +207,31 @@
     $: slowest = [...reads].sort((a, b) => b.latency - a.latency).slice(0, 3);
     const short = (p) => p.replace(/^\/api\//, '/').replace(/\/\{.*?\}/g, '/*');
 
-    // Swarm on a log axis, 0.1 ms to 1 s: every endpoint is a dot, dots dodge vertically
-    const LAT_MAX = 112, LAT_AXIS = 24, R = 5, DECADES = [0.1, 1, 10, 100, 1000];
-    // anything faster than 0.1 ms sits on the first tick, so that tick says so
+    // Histogram on a log axis, 0.1 ms to 1 s: six bars a decade, each as tall as the number of
+    // endpoints that answer in that range (too many endpoints now for one dot each)
+    const LAT_AXIS = 24, LAT_TOP = 30, BAR_H = 80, PER_DEC = 8, NBINS = 4 * PER_DEC, DECADES = [0.1, 1, 10, 100, 1000];
+    // anything faster than 0.1 ms sits in the first bar, so that tick says so
     const tickLabel = (d) => d >= 1000 ? '1 s' : d === 0.1 ? '≤0.1 ms' : `${d} ms`;
-    let latW = 600, hoverPath = null, latCardW = 1200;
+    let latW = 600, hoverPath = null, latCardW = 1200, hoverBin = -1;
     $: lx = (ms) => 12 + (Math.log10(Math.min(1000, Math.max(0.1, ms))) + 1) / 4 * (latW - 24);
-    $: swarm = (() => {
-        const mid = (LAT_MAX - LAT_AXIS) / 2, step = 2 * R + 3, placed = [];
-        for (const e of [...reads].sort((a, b) => a.latency - b.latency)) {
-            const x = lx(e.latency);
-            let y = mid;
-            for (let k = 0; k < 14; k++) {
-                const cy = mid + Math.ceil(k / 2) * step * (k % 2 ? -1 : 1);
-                if (cy < R + 2 || cy > LAT_MAX - LAT_AXIS - R - 2) continue;
-                if (!placed.some(p => (p.x - x) ** 2 + (p.y - cy) ** 2 < step * step)) { y = cy; break; }
-            }
-            placed.push({ x, y, path: e.path, id: e.id, ms: e.latency, hist: (e.history || []).filter(h => h.status).map(h => h.latency), i: placed.length });
-        }
-        // the band hugs the cluster: room for the "typical" label above, a little below
-        if (placed.length) {
-            const top = Math.min(...placed.map(p => p.y));
-            for (const p of placed) p.y += LAT_TOP + R - top;
-        }
-        return placed;
+    const binOf = (ms) => Math.max(0, Math.min(NBINS - 1, Math.floor((Math.log10(Math.max(0.1, ms)) + 1) * PER_DEC)));
+    $: bins = (() => {
+        const out = Array.from({ length: NBINS }, (_, i) => ({ i, lo: 10 ** (i / PER_DEC - 1), hi: 10 ** ((i + 1) / PER_DEC - 1), eps: [] }));
+        for (const e of reads) out[binOf(e.latency)].eps.push(e);
+        for (const b of out) b.eps.sort((x, y) => y.latency - x.latency);
+        return out;
     })();
-    const LAT_TOP = 26, LAT_BOTTOM = 14;
-    $: latH = (swarm.length ? Math.max(...swarm.map(p => p.y)) + R : LAT_TOP + 2 * R) + LAT_BOTTOM + LAT_AXIS;
-    $: hoverDot = swarm.find(p => p.path === hoverPath);
-    $: histMax = hoverDot ? Math.max(...hoverDot.hist, 0.001) : 1;
+    $: binMax = Math.max(1, ...bins.map(b => b.eps.length));
+    const latH = LAT_TOP + BAR_H + LAT_AXIS;
+    // a slowest chip lights up the bar its endpoint is in
+    $: litBin = hoverBin >= 0 ? hoverBin : hoverPath ? binOf(reads.find(e => e.path === hoverPath)?.latency ?? 0) : -1;
+    $: tipBin = hoverBin >= 0 ? bins[hoverBin] : null;
+    // the popup stays while the pointer moves from the bar into it, so its endpoints can be picked
+    let tipTimer, pinBin = -1;
+    // a click pins the popup (hover only previews), so its endpoints can be picked
+    const unpin = () => { if (pinBin >= 0) { pinBin = -1; hoverBin = -1; } };
+    const leaveBin = () => { clearTimeout(tipTimer); tipTimer = setTimeout(() => hoverBin = -1, 220); };
+    const binRange = (b) => `${fmtMs(b.lo)}–${fmtMs(b.hi)}`;
     const openEp = (id) => location.hash = id ? `#endpoints/${id}/history` : '#endpoints';
     let backup = null;
     async function fetchBackup() {
@@ -285,7 +281,7 @@
     });
 </script>
 
-<svelte:window bind:innerWidth={vw} />
+<svelte:window bind:innerWidth={vw} on:click={(e) => !e.target.closest?.(".lat-tip, .hit") && unpin()} on:keydown={e => e.key === 'Escape' && unpin()} />
 {#if customizing}
 <CustomizeMenu mode="editor" />
 {:else}
@@ -348,33 +344,38 @@
                 <span class="lat-s">{#if p95Ms != null}95% of {reads.length} endpoints answer in under {fmtMs(p95Ms)}{:else}No measurements yet{/if}</span>
             </div>
             <div class="lat-plot"><div class="lat-area" bind:clientWidth={latW}>
-                <svg width={latW} height={latH} role="img" aria-label="Response time of each endpoint, log scale from 0.1 ms to 1 s">
-                    <rect class="slow-band" x={lx(100)} y="0" width={lx(1000) - lx(100)} height={latH - LAT_AXIS} rx="6" />
-                    <text class="band-lbl" x={lx(1000) - 8} y="14" text-anchor="end">Slow</text>
+                <svg width={latW} height={latH} role="img" aria-label="How many endpoints answer in each response-time range, log scale from 0.1 ms to 1 s">
+                    <rect class="slow-band" x={lx(100)} y={LAT_TOP - 8} width={lx(1000) - lx(100) + 4} height={BAR_H + 8} rx="6" />
+                    <text class="band-lbl" x={lx(1000) - 4} y={LAT_TOP + 6} text-anchor="end">Slow</text>
+                    <line class="base" x1="8" x2={latW - 8} y1={LAT_TOP + BAR_H + 0.5} y2={LAT_TOP + BAR_H + 0.5} />
                     {#each DECADES as d}
-                        <line class="grid" x1={lx(d)} x2={lx(d)} y1="0" y2={latH - LAT_AXIS} />
-                        <text class="tick" x={lx(d)} y={latH - 7} text-anchor={d === 0.1 ? 'start' : d === 1000 ? 'end' : 'middle'}>{tickLabel(d)}</text>
+                        <line class="tk" x1={lx(d)} x2={lx(d)} y1={LAT_TOP + BAR_H} y2={LAT_TOP + BAR_H + 4} />
+                        <text class="tick" x={lx(d)} y={latH - 5} text-anchor={d === 0.1 ? 'start' : d === 1000 ? 'end' : 'middle'}>{tickLabel(d)}</text>
+                    {/each}
+                    {#each bins as b (b.i)}
+                        {#if b.eps.length}
+                            {@const h = Math.max(4, b.eps.length / binMax * BAR_H)}
+                            {@const x = lx(b.lo) + 1.5}
+                            {@const w = Math.max(2, lx(b.hi) - lx(b.lo) - 3)}
+                            <path class="bar" class:hl={litBin === b.i} class:dim={litBin >= 0 && litBin !== b.i}
+                                d="M{x},{LAT_TOP + BAR_H} v{-(h - 2)} q0,-2 2,-2 h{Math.max(0, w - 4)} q2,0 2,2 v{h - 2} z" />
+                            <rect class="hit" x={x - 1} y={LAT_TOP + BAR_H - Math.max(h, 14)} width={w + 2} height={Math.max(h, 14)} role="presentation" on:mouseenter={() => { if (pinBin < 0) { clearTimeout(tipTimer); hoverBin = b.eps.length ? b.i : -1; } }} on:mouseleave={() => pinBin < 0 && leaveBin()} on:click|stopPropagation={() => { pinBin = b.eps.length && pinBin !== b.i ? b.i : -1; hoverBin = pinBin; }} />
+                            <text class="cnt" x={x + w / 2} y={LAT_TOP + BAR_H - h - 5} text-anchor="middle">{b.eps.length}</text>
+                        {/if}
                     {/each}
                     {#if medianMs != null}
-                        <line class="med" x1={lx(medianMs)} x2={lx(medianMs)} y1="18" y2={latH - LAT_AXIS} />
-                        <text class="med-lbl" x={lx(medianMs)} y="12" text-anchor="middle">typical</text>
+                        <line class="med" x1={lx(medianMs)} x2={lx(medianMs)} y1="14" y2={LAT_TOP + BAR_H} />
+                        <text class="med-lbl" x={lx(medianMs)} y="10" text-anchor="middle">typical</text>
                     {/if}
-                    {#each swarm as p (p.path)}
-                        <circle class="dot" class:hl={hoverPath === p.path} class:dim={hoverPath && hoverPath !== p.path} cx={p.x} cy={p.y} r={hoverPath === p.path ? R + 1.5 : R} style="--i: {p.i}" />
-                    {/each}
-                    {#each swarm as p (p.path)}
-                        <circle class="hit" cx={p.x} cy={p.y} r="10" role="presentation" on:mouseenter={() => hoverPath = p.path} on:mouseleave={() => hoverPath = null} on:click={() => openEp(p.id)} />
-                    {/each}
                 </svg>
-                {#if hoverDot}
-                    <div class="lat-tip" style="left: {Math.min(Math.max(hoverDot.x, 110), latW - 110)}px; top: {hoverDot.y}px; --arrow: {hoverDot.x - Math.min(Math.max(hoverDot.x, 110), latW - 110)}px">
-                        <div class="tip-row"><span class="tip-p">{short(hoverDot.path)}</span><b>{fmtMs(hoverDot.ms)}</b></div>
-                        {#if hoverDot.hist.length > 1}
-                            <div class="tip-hist" title="Last {hoverDot.hist.length} responses">
-                                {#each hoverDot.hist as h}<i style="height: {Math.max(12, h / histMax * 100)}%"></i>{/each}
-                                <small>last {hoverDot.hist.length}</small>
-                            </div>
-                        {/if}
+                {#if tipBin}
+                    {@const cx = (lx(tipBin.lo) + lx(tipBin.hi)) / 2}
+                    {@const left = Math.min(Math.max(cx, 120), latW - 120)}
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <div class="lat-tip pick" style="left: {left}px; top: {LAT_TOP + BAR_H - Math.max(4, tipBin.eps.length / binMax * BAR_H)}px; --arrow: {cx - left}px" on:mouseenter={() => clearTimeout(tipTimer)} on:mouseleave={() => pinBin < 0 && leaveBin()} on:click|stopPropagation>
+                        <div class="tip-row"><b>{tipBin.eps.length} {tipBin.eps.length === 1 ? 'endpoint' : 'endpoints'}</b><span class="tip-r">{binRange(tipBin)}</span></div>
+                        {#if pinBin < 0}<div class="tip-hint">Click to see them</div>{/if}
+                        {#if pinBin >= 0}<div class="tip-list">{#each tipBin.eps as e (e.path)}<a class="tip-row tip-a" href={e.id ? `#endpoints/${e.id}/history` : '#endpoints'}><span class="tip-p">{short(e.path)}</span><span>{fmtMs(e.latency)}</span></a>{/each}</div>{/if}
                     </div>
                 {/if}
             </div></div>
@@ -476,16 +477,31 @@
     .lat-plot { position: relative; padding: 16px 20px 12px; min-width: 0; align-self: center; }
     .lat-area { position: relative; }
     .lat-plot svg { display: block; overflow: visible; }
-    .slow-band { fill: var(--red); opacity: 0.06; }
+    .slow-band { fill: var(--highlight-3); }
+    .base { stroke: var(--border); stroke-width: 1; }
+    .tk { stroke: var(--border); stroke-width: 1; }
+    .cnt { font-size: 10.5px; fill: var(--text-secondary); font-variant-numeric: tabular-nums; opacity: 0; transition: opacity .15s; }
+    .lat-area:hover .cnt { opacity: 1; }
     .band-lbl { font-size: 11px; font-weight: 500; fill: var(--text-secondary); }
     .grid { stroke: var(--highlight-20); stroke-width: 1; stroke-dasharray: 2 3; }
     .tick { font-size: 11px; fill: var(--text-secondary); font-variant-numeric: tabular-nums; }
     .dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; opacity: 0.85; transition: r .15s ease, opacity .15s ease, cx .6s cubic-bezier(0.22, 1, 0.36, 1), cy .6s cubic-bezier(0.22, 1, 0.36, 1); animation: dot-in .5s cubic-bezier(0.22, 1, 0.36, 1) backwards; animation-delay: calc(var(--i) * 18ms); }
     @keyframes dot-in { from { opacity: 0; transform: translateY(6px); } }
-    .med { stroke: var(--text-primary); stroke-width: 1; opacity: 0.35; }
-    .med-lbl { font-size: 10.5px; font-weight: 600; fill: var(--text-secondary); letter-spacing: 0.02em; }
-    .dot.hl { opacity: 1; }
-    .dot.dim { opacity: 0.25; }
+    .med { stroke: var(--accent); stroke-width: 1.5; pointer-events: none; }
+    .med-lbl { font-size: 10.5px; font-weight: 600; fill: var(--accent); letter-spacing: 0.02em; pointer-events: none; }
+    .bar { fill: var(--text-secondary); opacity: 0.32; transition: opacity .15s ease, fill .15s ease; }
+    .bar.hl { opacity: 0.75; }
+    .bar.dim { opacity: 0.18; }
+    .tip-r { opacity: 0.7; font-variant-numeric: tabular-nums; }
+    /* the bar's popup can be entered: every endpoint in the range, each opening its history */
+    .lat-tip.pick { pointer-events: auto; padding: 8px 6px 6px; min-width: 240px; }
+    .lat-tip.pick > .tip-row { padding: 0 6px 4px; }
+    .lat-tip.pick::before { content: ''; position: absolute; left: 0; right: 0; bottom: -14px; height: 14px; }
+    .tip-list { display: flex; flex-direction: column; max-height: 180px; overflow-y: auto; }
+    .tip-hint { padding: 0 6px 2px; font-size: 11px; opacity: 0.6; }
+    .lat-tip.pick:not(:has(.tip-list)) { min-width: 0; }
+    .tip-a { padding: 4px 6px; border-radius: 4px; color: inherit; text-decoration: none; }
+    .tip-a:hover { background: color-mix(in srgb, var(--surface) 18%, transparent); }
     .hit { fill: transparent; cursor: pointer; }
     .lat-tip { position: absolute; transform: translate(-50%, calc(-100% - 12px)); display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 6px; background: var(--text-primary); color: var(--surface); font-size: 12px; white-space: nowrap; pointer-events: none; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); z-index: 2; }
     .lat-tip::after { content: ''; position: absolute; left: calc(50% + var(--arrow, 0px)); bottom: -4px; width: 8px; height: 8px; background: inherit; transform: translateX(-50%) rotate(45deg); border-radius: 1px; }
