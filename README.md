@@ -299,3 +299,7 @@ detects this and uses Homebrew's copy (<code>brew install expat</code>).
 Check <code>~/.config/homelab/logs/dashboard.err</code>. Only one instance can hold the port,
 and a second one exits.
 </details>
+
+## License
+
+MIT, see [LICENSE](LICENSE).
