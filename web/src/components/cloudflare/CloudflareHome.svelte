@@ -137,13 +137,13 @@
         <section class="ui-card">
             <div class="ui-tbl-wrap">
                 <table class="ui-tbl dns">
-                    <colgroup><col class="w-ty" /><col class="w-nm" /><col /><col class="w-px" /><col class="w-ttl" /></colgroup>
+                    <colgroup><col class="w-ty" /><col class="w-nm" /><col class="w-ct" /><col class="w-px" /><col class="w-ttl" /></colgroup>
                     <thead><tr><th>Type</th><th>Name</th><th>Content</th><th>Proxy</th><th>TTL</th></tr></thead>
                     <tbody>
                         {#each shownRecords as r (r.id)}
                             <tr title={r.comment || null}>
                                 <td class="ty">{r.type}</td>
-                                <td class="rn">{r.name}</td>
+                                <td class="rn">{r.name}<small class="rn-ct ui-mono">{r.tunnel ? `tunnel ${r.tunnel}` : r.content}</small></td>
                                 <td class="ct">
                                     {#if r.tunnel}
                                         <button class="tun-link" on:click={() => onNavigate('Cloudflare', r.tunnel)}><Cable size={13} />{r.tunnel}</button>
@@ -261,6 +261,8 @@
     .dns tbody tr:hover td { background: var(--highlight-3); }
     .ty { font-weight: 600; font-size: 12.5px; color: var(--text-secondary); }
     .rn { font-weight: 500; }
+    /* the content as a grey line under the name; only on a phone, where its column goes */
+    .rn-ct { display: none; }
     .ct { color: var(--text-secondary); }
     .ct .val { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; }
     .ct :global(.ui-tag) { margin-left: 8px; }
@@ -295,5 +297,10 @@
         .ic { display: none; }
         .w-cn { width: 0; } .tun th:nth-child(3), .tun td:nth-child(3) { padding: 0; font-size: 0; }
         .tun td:nth-child(3) * { display: none; }
+        .w-ty { width: 70px; } .w-nm { width: auto; } .w-ct { width: 0; }
+        .dns th:nth-child(3), .dns td:nth-child(3) { padding: 0; font-size: 0; }
+        .dns td:nth-child(3) * { display: none; }
+        .dns .rn { overflow: hidden; text-overflow: ellipsis; }
+        .rn-ct { display: block; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; font-weight: 400; color: var(--text-secondary); margin-top: 2px; }
     }
 </style>
