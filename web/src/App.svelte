@@ -372,7 +372,7 @@
 
 
                 {#if activeTab === 'Overview'}
-                    <OverviewTab {stats} {tmux} />
+                    <OverviewTab {stats} {tmux} section={activeSection} sub={activeSub} onNavigate={navigate} />
                 {/if}
             {/if}
             </div>

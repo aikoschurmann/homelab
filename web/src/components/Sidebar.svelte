@@ -14,6 +14,7 @@
     import { backups, fetchBackups } from '../lib/backups.js';
     import { updates, fetchUpdates } from '../lib/updates.js';
     import { endpointGroups, fetchEndpoints } from '../lib/endpoints.js';
+    import { overviewPages } from '../lib/widgets.js';
     export let activeTab = "Overview";
     export let activeSection = null;
     export let activeSub = null;
@@ -220,7 +221,7 @@
 {#snippet treeItem(item)}
     {@const open = expanded.has(item.tab)}
     {@const active = activeTab === item.tab}
-    {@const kids = item.sub ? childrenOf(item.tab, null, null, $tsCounts, null, active ? activeSection : null, $cfCounts, $databases, $backups, $endpointGroups, $updates) : []}
+    {@const kids = item.sub ? childrenOf(item.tab, null, null, $tsCounts, null, active ? activeSection : null, $cfCounts, $databases, $backups, $endpointGroups, $updates, $overviewPages) : []}
     {@const childOn = active && kids.some(c => c.id === (activeSection ?? ''))}
     <div class="tn-row" class:active={active && !childOn} class:in={active && childOn} style="--d: 0">
         {#if kids.length}
@@ -299,7 +300,7 @@
                      except items marked sub (Cloudflare), whose filters are listed here too -->
                 {@const open = expanded.has(item.tab)}
                 {@const active = activeTab === item.tab}
-                {@const kids = item.sub ? childrenOf(item.tab, null, null, $tsCounts, null, active ? activeSection : null, $cfCounts, $databases, $backups, $endpointGroups, $updates) : []}
+                {@const kids = item.sub ? childrenOf(item.tab, null, null, $tsCounts, null, active ? activeSection : null, $cfCounts, $databases, $backups, $endpointGroups, $updates, $overviewPages) : []}
                 {@const childOn = active && kids.some(c => c.id === (activeSection ?? ''))}
                 <div class="nav-item" class:has-kids={kids.length}>
                     <div class="row" class:active={active && !childOn} class:in={active}>

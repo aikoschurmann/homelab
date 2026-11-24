@@ -1,6 +1,7 @@
 <script>
     import { Menu, Search, ChevronRight } from 'lucide-svelte';
     import UplinkStatus from './UplinkStatus.svelte';
+    import { overviewPages } from '../lib/widgets.js';
     import { groupOf, childrenOf, tabLabel, PARENTS, firstPage } from '../lib/nav.js';
     import { machines, crumbLabels } from '../lib/stores.js';
     import { services } from '../lib/services.js';
@@ -24,7 +25,7 @@
     // only a folded parent (Network) is a crumb; Tools is just a sidebar heading
     $: group = PARENTS[groupOf(activeTab)] ? groupOf(activeTab) : null;
     // a section that isn't in the menu (e.g. "new") still gets a crumb
-    $: found = activeSection && (childrenOf(activeTab, $machines?.machines, $services, $tsCounts, $hosts, activeSection, $cfCounts, $databases, $backups).find(c => c.id === activeSection)
+    $: found = activeSection && (childrenOf(activeTab, $machines?.machines, $services, $tsCounts, $hosts, activeSection, $cfCounts, $databases, $backups, null, null, $overviewPages).find(c => c.id === activeSection)
         || { id: activeSection, label: activeSection === 'new' ? 'Create' : $crumbLabels[activeSection] || activeSection });
     // pages can register a friendlier label for their own ids (e.g. an endpoint's method + path)
     $: section = found && ($crumbLabels[activeSection] ? { ...found, label: $crumbLabels[activeSection] } : found);

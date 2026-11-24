@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 
 // The Overview's sections in their default order; the page's "Customize" menu can reorder
 // and hide them, and hide single host cards. Host card order is the shared host order
@@ -52,10 +52,13 @@ function tileJoins(j) {
 export const COLS = ['auto', '1', '2', '3', '4'];
 
 // { order, hidden, hidden_hosts }: kept in /api/prefs (overview_layout) so every device
-// shows the same page, with a copy in this browser so it paints right away
+// shows the same page, with a copy in this browser so it paints right away.
+// The Overview has tabs: the first ('' id, its route #overview) keeps overview_layout; the
+// others are overview_pages [{ id, name, layout }] (route #overview/<id>). `layout` is the
+// open tab's.
 const LOCAL = 'overview_layout';
+const LOCAL_PAGES = 'overview_pages';
 const OLD = 'overview_hidden_widgets_v2';
-
 function norm(l = {}) {
     // sections added since the layout was saved go in at their default place
     // metric widgets sit among the sections as 'm:<widget id>' ('metrics': where they all went before)
@@ -81,25 +84,95 @@ function loadLocal() {
     try { const l = JSON.parse(localStorage.getItem(LOCAL)); if (l) return norm(l); } catch (e) {}
     try { return norm({ hidden: JSON.parse(localStorage.getItem(OLD)) || [] }); } catch (e) { return norm(); }
 }
+// a new tab starts empty: every section there but hidden, for Add to bring in
+const blank = () => norm({ order: [...IDS], hidden: [...IDS] });
+const MAIN_NAME = 'Main';
+function normPages(list) {
+    return (Array.isArray(list) ? list : []).filter(p => p && p.id && typeof p.id === 'string')
+        .map(p => ({ id: p.id, name: String(p.name || 'Tab').slice(0, 40), layout: p.layout ? norm(p.layout) : blank() }));
+}
+function loadLocalPages() { try { return normPages(JSON.parse(localStorage.getItem(LOCAL_PAGES))); } catch (e) { return []; } }
 
-export const layout = writable(loadLocal());
+// every tab's layout by id, and the tabs in order ({ id, name }; the first is the main one)
+let all = { '': loadLocal() };
+let mainName = (() => { try { return localStorage.getItem('overview_main_name') || MAIN_NAME; } catch (e) { return MAIN_NAME; } })();
+for (const p of loadLocalPages()) all[p.id] = p.layout;
+const tabsOf = (extra) => [{ id: '', name: mainName }, ...extra.map(p => ({ id: p.id, name: p.name }))];
+export const overviewPages = writable(tabsOf(loadLocalPages()));
+let active = '';
+export const layout = writable(all['']);
 export const hiddenWidgets = derived(layout, l => new Set(l.hidden));
+
+// open another tab (an id that isn't one opens the main tab); returns the id opened
+export function openPage(id) {
+    const want = id && all[id] ? id : '';
+    if (want !== active) { active = want; layout.set(all[want]); }
+    return want;
+}
 
 export async function fetchLayout() {
     try {
         const j = await fetch('/api/prefs').then(r => r.json());
-        if (j.status === 'success' && j.data?.overview_layout) layout.set(norm(j.data.overview_layout));
+        if (j.status !== 'success') return;
+        if (j.data?.overview_layout) all[''] = norm(j.data.overview_layout);
+        if (j.data?.overview_main_name) mainName = String(j.data.overview_main_name);
+        const extra = normPages(j.data?.overview_pages);
+        all = { '': all[''], ...Object.fromEntries(extra.map(p => [p.id, p.layout])) };
+        overviewPages.set(tabsOf(extra));
+        cacheLocal();
+        if (!all[active]) active = '';
+        layout.set(all[active]);
     } catch (e) {}
 }
 
+const extraPages = () => get(overviewPages).slice(1).map(p => ({ ...p, layout: all[p.id] }));
+function cacheLocal() {
+    try {
+        localStorage.setItem(LOCAL, JSON.stringify(all['']));
+        localStorage.setItem(LOCAL_PAGES, JSON.stringify(extraPages()));
+        localStorage.setItem('overview_main_name', mainName);
+    } catch (e) {}
+}
 let saveTimer;
-function save(l) {
-    layout.set(l);
-    try { localStorage.setItem(LOCAL, JSON.stringify(l)); } catch (e) {}
+function push() {
+    cacheLocal();
     // dragging saves on every step; the server gets the last one
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ overview_layout: l }) }).catch(() => {}), 400);
+    saveTimer = setTimeout(() => fetch('/api/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ overview_layout: all[''], overview_pages: extraPages(), overview_main_name: mainName }) }).catch(() => {}), 400);
 }
+function save(l, id = active) {
+    all[id] = l;
+    if (id === active) layout.set(l);
+    push();
+}
+
+// ---- the tabs themselves ----------------------------------------------------------------
+export function addPage(name) {
+    const id = 'p' + Math.random().toString(36).slice(2, 7);
+    all[id] = blank();
+    overviewPages.update(ps => [...ps, { id, name: name || `Tab ${ps.length + 1}` }]);
+    push();
+    return id;
+}
+export function renamePage(id, name) {
+    name = String(name || '').trim().slice(0, 40);
+    if (!name) return;
+    if (id === '') mainName = name;
+    overviewPages.update(ps => ps.map(p => p.id === id ? { ...p, name } : p));
+    push();
+}
+// a tab removed; returns the metric widgets that were on it (for the caller to drop)
+export function deletePage(id) {
+    if (!id || !all[id]) return [];
+    const cards = all[id].order.filter(t => t.startsWith('m:')).map(t => t.slice(2));
+    delete all[id];
+    overviewPages.update(ps => ps.filter(p => p.id !== id));
+    if (active === id) openPage('');
+    push();
+    return cards;
+}
+export const setPageOrder = (ids) => { overviewPages.update(ps => [ps[0], ...ids.map(i => ps.find(p => p.id === i)).filter(p => p && p.id)]); push(); };
 // Merges belong to a spot between two neighbours, not to the two tiles: after any reorder a
 // merge is kept only if the same two tiles are still side by side, in the same order (the one
 // dragged leaves its merges behind, and two tiles that meet again later don't snap back together).
@@ -134,15 +207,21 @@ export const setWidth = (id, w) => update(l => ({ ...l, widths: { ...l.widths, [
 export const setShortcuts = (list) => update(l => ({ ...l, shortcuts: list }));
 export const setWidgetOrder = (order) => update(l => ({ ...l, order }));
 export const showAllWidgets = () => update(l => ({ ...l, hidden: [], hidden_hosts: [], hidden_tiles: [] }));
-export const resetLayout = () => update(() => ({}));
+export const resetLayout = () => update(() => active ? blank() : ({}));
 
 // keep the metric widgets in the order: new ones where the old Metrics section was (else after
 // the cluster totals for a first set, else at the end), removed ones out
 export function syncMetrics(cardIds) {
     let cur; layout.subscribe(v => cur = v)();
     const want = cardIds.map(i => 'm:' + i), wantSet = new Set(want);
+    // widgets that are gone leave every tab; one on no tab at all comes to this one
+    for (const [id, l] of Object.entries(all)) {
+        if (id === active || !l.order.some(t => t.startsWith('m:') && !wantSet.has(t))) continue;
+        save(norm({ ...l, order: l.order.filter(t => !t.startsWith('m:') || wantSet.has(t)) }), id);
+    }
+    const elsewhere = new Set(Object.entries(all).filter(([id]) => id !== active).flatMap(([, l]) => l.order));
     let order = cur.order.filter(t => !t.startsWith('m:') || wantSet.has(t));
-    const missing = want.filter(t => !order.includes(t));
+    const missing = want.filter(t => !order.includes(t) && !elsewhere.has(t));
     const old = order.indexOf('metrics');
     if (old >= 0) order.splice(old, 1, ...missing);
     else if (missing.length) {

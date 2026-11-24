@@ -1,5 +1,7 @@
 import { SN } from './server.js';
 import { groupSlug } from './endpoints.js';
+import { overviewPages } from './widgets.js';
+import { get } from 'svelte/store';
 import { Activity, Eye, Boxes, Database, Box, Archive, Terminal, Settings, Network, Server, Gauge, Cloud, Globe, ScrollText, PackageCheck, Store } from 'lucide-svelte';
 
 // Sidebar tree. A child with `el` is a section of its page (the element id it scrolls
@@ -11,7 +13,8 @@ const page = (id, label) => ({ id, label, el: null });
 
 export const NAV = [
     { items: [
-        { tab: 'Overview', icon: Activity },
+        // sub: its tabs (lib/widgets.js) show under it once there is more than one
+        { tab: 'Overview', icon: Activity, sub: true },
     ] },
     // the sidebar draws this group as the tree from lib/infra.js
     { label: 'Infrastructure', tree: true, items: [
@@ -148,9 +151,10 @@ function current(tab, section, kids, serviceList, cfCounts, epGroups) {
 }
 
 // Children of a tab, with live machines, services, tailnet counts and the open item
-export function childrenOf(tab, machineList, serviceList, tsCounts, hostList, section = null, cfCounts = null, dbList = null, backupList = null, epGroups = null, updList = null) {
+export function childrenOf(tab, machineList, serviceList, tsCounts, hostList, section = null, cfCounts = null, dbList = null, backupList = null, epGroups = null, updList = null, ovPages = null) {
     const item = NAV.flatMap(g => g.items).find(i => i.tab === tab);
     let kids = item?.children || [];
+    if (tab === 'Overview') { const ps = ovPages || get(overviewPages); kids = ps.length > 1 ? ps.map(p => ({ id: p.id, label: p.name, el: null })) : []; }
     if (tab === 'Hosts') kids = [...kids, ...hostChildren(hostList)];
     if (tab === 'Machines') kids = [...kids, ...machineChildren(machineList)];
     if (tab === 'Services') kids = [...kids, ...serviceChildren(serviceList)];

@@ -3,7 +3,7 @@
     import { infoPop } from '../lib/infoPop.js';
     import { onMount } from 'svelte';
     import { Database, Terminal, ArrowRight, Archive, SlidersHorizontal, Check, Info, PackageCheck, Store, ScrollText, Network, Cloud, ShieldCheck, Eye } from 'lucide-svelte';
-    import { layout, hiddenWidgets, fetchLayout, measureSection, syncMetrics, syncHosts, syncMachines, placeItems, orderWithout, baseOf, copyOf } from '../lib/widgets.js';
+    import { layout, hiddenWidgets, overviewPages, openPage, addPage, renamePage, deletePage, fetchLayout, measureSection, syncMetrics, syncHosts, syncMachines, placeItems, orderWithout, baseOf, copyOf } from '../lib/widgets.js';
     import { mlayout, loadLayout as loadMetrics } from '../lib/metrics.js';
     import SectionSettings from './overview/SectionSettings.svelte';
     import WidgetGallery from './overview/WidgetGallery.svelte';
@@ -12,9 +12,23 @@
     import { removeCard, addCard } from '../lib/metrics.js';
     import { tick } from 'svelte';
     import { Plus, RotateCcw, Pencil, Trash2, ChevronLeft, ChevronRight, GripVertical } from 'lucide-svelte';
-    // #overview/customize shows the layout editor in place of the page
-    let customizing = typeof location !== 'undefined' && location.hash === '#overview/customize';
-    onMount(() => { const f = () => customizing = location.hash === '#overview/customize'; window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f); });
+    // tabs: #overview is the main one, #overview/<id> another; …/customize shows the layout
+    // editor in place of the page (#overview/customize for the main tab)
+    let route = null, routeSub = null;
+    export { route as section, routeSub as sub };
+    export let onNavigate = () => {};
+    $: customizing = route === 'customize' || routeSub === 'customize';
+    $: pageId = openPage(route && route !== 'customize' ? route : '', $overviewPages);
+    $: page = $overviewPages.find(p => p.id === pageId) || $overviewPages[0];
+    const goPage = (id, edit = false) => onNavigate('Overview', id ? id : (edit ? 'customize' : null), id && edit ? 'customize' : null);
+    let renaming = false;
+    $: pageId, renaming = false;
+    function newTab() { goPage(addPage(), true); }
+    function dropTab() {
+        if (!pageId || !confirm(`Delete the tab "${page.name}"? Its sections and widgets go with it.`)) return;
+        for (const c of deletePage(pageId)) removeCard(c);
+        goPage('');
+    }
     import { endpoints, fetchEndpoints, machines, fetchMachines, machineUsage, fetchMachineUsage, gbFromMib, visible } from '../lib/stores.js';
     import { services, fetchServices, fmtMb } from '../lib/services.js';
     import { fmtBytes, imageLabel } from '../lib/machines.js';
@@ -33,6 +47,7 @@
     import { cloudflare, isActive } from '../lib/cloudflare.js';
     import LiveChart from './ui/LiveChart.svelte';
     import AttentionRow from './overview/AttentionRow.svelte';
+    import Tabs from './ui/Tabs.svelte';
     import MetricsGrid from './metrics/MetricsGrid.svelte';
 
     export let stats;
@@ -419,7 +434,7 @@
     }
     const setWidthOf = (id, w) => setWidth(id, w);
     const openSettings = (id) => { setId = id; setOpen = true; };
-    const done = () => { location.hash = '#overview'; };
+    const done = () => goPage(pageId);
 
     // the metric widgets take their places among the sections once both layouts are in
     let both = false;
@@ -445,13 +460,22 @@
     {#if customizing}
     <div class="ui-head">
         <div>
-            <h1>Customize overview</h1>
-            <p class="ed-p">Drag sections by their header and widgets to arrange them; change a section from its header. Saved for every device.</p>
+            {#if renaming}
+                <!-- svelte-ignore a11y_autofocus -->
+                <input class="ui-input name-edit" aria-label="Tab name" maxlength="40" value={page.name} autofocus
+                    on:keydown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = page.name; renaming = false; } }}
+                    on:blur={(e) => { renamePage(pageId, e.currentTarget.value); renaming = false; }} />
+            {:else}
+                <h1>Customize{$overviewPages.length > 1 ? ' ' + page.name : ''}</h1>
+            {/if}
+            <p class="ed-p">Drag to arrange; change a section from its header. Saved for every device.</p>
         </div>
         <div class="ui-head-actions">
-            <button class="ui-btn primary" on:click={() => galOpen = true}><Plus size={14} /> Add</button>
-            <button class="ui-btn" on:click={resetLayout}><RotateCcw size={14} /> Reset</button>
-            <button class="ui-btn" on:click={done}>Done</button>
+            {#if $overviewPages.length > 1}<button class="ui-btn" on:click={() => renaming = true}><Pencil size={14} /> Rename</button>{/if}
+            {#if pageId}<button class="ui-btn" on:click={dropTab}><Trash2 size={14} /> Delete tab</button>{/if}
+            <button class="ui-btn" on:click={resetLayout} title="Put this tab back as it started"><RotateCcw size={14} /> Reset</button>
+            <button class="ui-btn" on:click={() => galOpen = true}><Plus size={14} /> Add</button>
+            <button class="ui-btn primary" on:click={done}><Check size={14} /> Done</button>
         </div>
     </div>
     {:else}
@@ -466,9 +490,13 @@
             </div>
         </div>
         <div class="ui-head-actions">
-            <button class="ui-btn" on:click={() => location.hash = '#overview/customize'}><SlidersHorizontal size={14} /> Customize</button>
+            <button class="ui-btn" on:click={newTab}><Plus size={14} /> New tab</button>
+            <button class="ui-btn" on:click={() => goPage(pageId, true)}><SlidersHorizontal size={14} /> Customize</button>
         </div>
     </div>
+    {/if}
+    {#if $overviewPages.length > 1}
+        <Tabs tabs={$overviewPages.map(p => ({ id: p.id, label: p.name }))} active={pageId} onSelect={(id) => goPage(id, customizing)} />
     {/if}
 
     <!-- the sections, in the order and with the cards picked under Customize -->
@@ -825,4 +853,5 @@
     }
     .up-link { color: inherit; text-decoration: none; }
     .up-link:hover { color: var(--accent); text-decoration: underline; }
+    .name-edit { width: 280px; max-width: 100%; height: 32px; font-size: 18px; font-weight: 600; }
 </style>
