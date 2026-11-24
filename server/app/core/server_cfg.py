@@ -32,7 +32,7 @@ def load():
     except (OSError, ValueError):
         cfg = {}
     existing_install = os.path.exists(os.path.join(paths.HOME, "prefs.json")) or \
-        os.path.exists(os.path.join(paths.LEGACY_HOME, ".homelab_prefs.json"))
+        (paths.ADOPT_LEGACY and os.path.exists(os.path.join(paths.LEGACY_HOME, ".homelab_prefs.json")))
     return {
         "name": (cfg.get("name") or "").strip() or _default_name(),
         "port": int(cfg.get("port") or DEFAULT_PORT),

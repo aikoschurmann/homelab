@@ -31,10 +31,15 @@ for _d, _mode in ((HOME, 0o700), (DATA, 0o700), (CACHE, 0o700), (SECRETS, 0o700)
     os.makedirs(_d, mode=_mode, exist_ok=True)
 
 LEGACY_HOME = os.path.expanduser("~")
+# Only the default location takes over pre-repo files: a second install or a test one with
+# its own HOMELAB_HOME starts empty instead of inheriting old hosts, prefs and secrets.
+# HOMELAB_ADOPT_LEGACY=0/1 overrides.
+ADOPT_LEGACY = os.environ.get("HOMELAB_ADOPT_LEGACY",
+                              "1" if HOME == os.path.abspath(os.path.expanduser("~/.config/homelab")) else "0") == "1"
 
 
 def _adopt(new, legacy):
-    if not os.path.exists(new) and os.path.exists(legacy):
+    if ADOPT_LEGACY and not os.path.exists(new) and os.path.exists(legacy):
         shutil.copy2(legacy, new)
     return new
 
@@ -57,7 +62,7 @@ def metrics_db():
     with SQLite's backup API, so a live WAL is carried over consistently."""
     path = os.path.join(DATA, "metrics.db")
     legacy = os.path.join(LEGACY_HOME, ".databases", "metrics.db")
-    if not os.path.exists(path) and os.path.exists(legacy):
+    if ADOPT_LEGACY and not os.path.exists(path) and os.path.exists(legacy):
         src = sqlite3.connect(f"file:{legacy}?mode=ro", uri=True)
         dst = sqlite3.connect(path + ".part")
         with dst:
