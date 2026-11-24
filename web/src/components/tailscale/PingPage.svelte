@@ -45,7 +45,7 @@
             <button class="ui-btn" disabled={all || !peers.length} on:click={pingAll}>{#if all}<Loader2 size={14} class="ui-spin" />{:else}<Activity size={14} />{/if} Ping all</button>
         </div>
         <div class="ui-tbl-wrap">
-            <table class="ui-tbl">
+            <table class="ui-tbl ping">
                 <thead><tr><th>Device</th><th>Path</th><th>Latency</th><th class="shrink"></th></tr></thead>
                 <tbody>
                     {#each peers as d (d.id)}
@@ -62,7 +62,7 @@
                                 {:else if r?.err}<span class="ui-dim">{r.err}</span>
                                 {:else}<span class="ui-dim">—</span>{/if}
                             </td>
-                            <td>{#if r?.data}<b class="lat">{ms(r.data.best_ms)} ms</b>{#if r.at}<small class="ui-dim">{' · '}{ago(new Date(r.at).toISOString(), now)}</small>{/if}{:else}<span class="ui-dim">—</span>{/if}</td>
+                            <td>{#if r?.data}<b class="lat">{ms(r.data.best_ms)} ms</b>{#if r.data}<small class="pth ph" class:relay={r.data.path === 'relay'}>{r.data.path === 'direct' ? 'Direct' : 'Relayed · ' + r.data.via}</small>{/if}{#if r.at}<small class="ui-dim ago">{' · '}{ago(new Date(r.at).toISOString(), now)}</small>{/if}{:else}<span class="ui-dim">—</span>{/if}</td>
                             <td><button class="ui-btn sm" disabled={r?.busy} on:click={() => ping(d)}>{#if r?.busy}<Loader2 size={13} class="ui-spin" />{:else}Ping{/if}</button></td>
                         </tr>
                     {/each}
@@ -83,5 +83,12 @@
     .pth { color: var(--green); white-space: nowrap; }
     .pth.relay { color: var(--amber); }
     .lat { font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .ph { display: none; }
     @media (max-width: 760px) { .ic { display: none; } }
+    /* phone: the path goes under the latency, so the Ping button stays on screen */
+    @media (max-width: 640px) {
+        .ping th:nth-child(2), .ping td:nth-child(2), .ping .ago { display: none; }
+        .ping td:first-child { width: 100%; max-width: 0; }
+        .ping .ph { display: block; font-size: 12px; }
+    }
 </style>
