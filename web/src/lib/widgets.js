@@ -58,8 +58,8 @@ function tileJoins(j) {
     const def = { totals: [], attention: [joinKey('updates', 'apps'), joinKey('apps', 'backups')], metrics: [] };
     return Object.fromEntries(Object.keys(def).map(k => [k, Array.isArray(j?.[k]) ? j[k] : def[k]]));
 }
-// how many cluster tiles per row ('auto' follows the screen width)
-export const COLS = ['auto', '1', '2', '3', '4'];
+// how many cluster tiles per row (never more than fit across the section, at ~240px each)
+export const COLS = ['1', '2', '3', '4'];
 
 // { order, hidden, hidden_hosts }: kept in /api/prefs (overview_layout) so every device
 // shows the same page, with a copy in this browser so it paints right away.
@@ -88,7 +88,7 @@ function norm(l = {}) {
         order.splice(at, 0, id);
     });
     return { order, hidden: [...(l.hidden || []).filter(id => IDS.includes(id) && !optIn.includes(id)), ...optIn], hidden_hosts: l.hidden_hosts || [],
-        hidden_tiles: l.hidden_tiles || [], tile_order: tileOrder(l.tile_order), tile_joins: tileJoins(l.tile_joins), totals_cols: COLS.includes(l.totals_cols) ? l.totals_cols : 'auto',
+        hidden_tiles: l.hidden_tiles || [], tile_order: tileOrder(l.tile_order), tile_joins: tileJoins(l.tile_joins), totals_cols: COLS.includes(String(l.totals_cols)) ? String(l.totals_cols) : '4',
         // sections at half width sit two to a row
         widths: Object.fromEntries(Object.entries(l.widths || {}).filter(([k, v]) => IDS.includes(baseOf(k)) && v === 'half')),
         // what each text or avatar section says and looks like, by its item ('text', 'text#k3x')

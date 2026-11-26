@@ -7,7 +7,6 @@
     // What a section shows, and in which order: its tiles, how many per row, its shortcuts.
     // The same in the section's settings and in the Add gallery; changes apply right away.
     export let kind = null;
-    export let compact = false;      // the gallery: "Fit" instead of "Fit screen"
 
     $: hiddenTiles = new Set($layout.hidden_tiles);
     $: tileLabel = Object.fromEntries((SECTION_TILES[kind] || []).map(t => [t.id, t.label]));
@@ -34,7 +33,7 @@
 {#if kind === 'totals'}
     <div class="ui-field">
         <span class="ui-label">Tiles per row</span>
-        <div class="ui-seg">{#each COLS as c}<button type="button" class:on={String($layout.totals_cols) === String(c)} on:click={() => setTotalsCols(c)}>{c === 'auto' ? (compact ? 'Fit' : 'Fit screen') : c}</button>{/each}</div>
+        <div class="ui-seg">{#each COLS as c}<button type="button" class:on={String($layout.totals_cols) === String(c)} on:click={() => setTotalsCols(c)}>{c}</button>{/each}</div>
     </div>
 {/if}
 {#if kind === 'shortcuts'}

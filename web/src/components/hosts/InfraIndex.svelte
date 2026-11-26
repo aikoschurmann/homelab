@@ -26,7 +26,8 @@
     // the Overview's Customize: tiles to leave out, and how many per row ('auto' or '1'–'4')
     export let hideTiles = [];
     export let order = ['hosts', 'cpu', 'mem', 'disk'];   // the tiles' order, from Customize
-    export let cols = 'auto';
+    export let cols = '4';
+    export let most = 4;          // out: how many tiles fit across at this width
     export let joins = [];        // pairs of neighbouring tiles that share one card ('a|b')
     export let onJoin = null;     // Customize: (a, b) merge or split two neighbours
     export let onSort = null;     // Customize: the tiles can be dragged into another order (ids)
@@ -133,11 +134,11 @@
     // stretches its last tile, so three tiles at two per row read as 2 + 1 ----------------
     // measured on the tiles' own row, so a half-width section lays out by its own width
     let cw = 1300;
-    $: auto = cols === 'auto';
-    $: tiles = order.filter(t => !hideTiles.includes(t) && !(t === 'hosts' && auto && cw < 1000));
-    // a fixed number still never squeezes a tile below about 240px (as Fit: 4 across from 1000px)
+    $: tiles = order.filter(t => !hideTiles.includes(t));
+    // the number chosen, but never squeezing a tile below about 240px (4 across from about 1000px)
+    $: most = Math.max(1, Math.floor((cw + 12) / 252));
     $: rows = Math.max(1, Math.ceil(tiles.length / perRow));
-    $: perRow = Math.max(1, Math.min(tiles.length, auto ? (cw >= 1000 ? 4 : cw >= 760 ? 3 : cw >= 420 ? 2 : 1) : Math.min(+cols, Math.max(1, Math.floor((cw + 12) / 252)))));
+    $: perRow = Math.max(1, Math.min(tiles.length, Math.min(+cols || 4, most)));
     $: gridCols = perRow === tiles.length && perRow > 1 ? tiles.map(t => t === 'hosts' ? 'minmax(0, 0.6fr)' : 'minmax(0, 1fr)').join(' ') : `repeat(${perRow}, minmax(0, 1fr))`;
     // merged with the tile before / after it: only on the same row
     $: jl = (t) => { const i = tiles.indexOf(t); return i > 0 && i % perRow !== 0 && joins.includes(joinKey(tiles[i - 1], t)); };

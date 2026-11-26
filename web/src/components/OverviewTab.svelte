@@ -276,7 +276,7 @@
     const agoTs = (t) => { const s = Math.max(0, now / 1000 - t); return s < 3600 ? `${Math.round(s / 60)}m ago` : s < 86400 ? `${Math.round(s / 3600)}h ago` : `${Math.round(s / 86400)}d ago`; };
     const inTs = (t) => { const s = Math.max(0, t - now / 1000); return s < 3600 ? `in ${Math.round(s / 60)}m` : s < 86400 ? `in ${Math.round(s / 3600)}h` : `in ${Math.round(s / 86400)}d`; };
     // narrower than two columns: every section full width, in order
-    let vw = 1440, totRows = 1;
+    let vw = 1440, totRows = 1, totMost = 4;
     $: narrow = vw <= 1000;
     // the shown sections in order, consecutive half-width ones grouped into pairs of columns
     // what is on the page, in order: sections and metric widgets ('m:<id>')
@@ -358,13 +358,14 @@
     }
     let setOpen = false, setId = null, galOpen = false;
     const tileName = Object.fromEntries(Object.values(SECTION_TILES).flat().map(t => [t.id, t.label]));
-    // a section's width as laid out, and how many totals tiles fit across it (as InfraIndex: >= ~240px each)
-    $: secW = (id) => { const c = $layout.cfg[id]?.cell || ($layout.widths[id] === 'half' ? 'half' : 'full'); return narrow || c === 'full' ? secsW : c === 'half' ? (secsW - 16) / 2 : secsW / 3; };
     $: totShown = ($layout.tile_order.totals || []).filter(t => !$layout.hidden_tiles.includes(t));
-    // the per-row choices that do something here: no more than fit, nor than there are tiles
-    $: colChoices = (id) => { const most = Math.min(totShown.length, Math.max(1, Math.floor((secW(id) + 12) / 252))); return COLS.filter(c => c === 'auto' || +c <= most); };
-    // Fit leaves the Hosts tile out below 1000px: its toggle would do nothing
-    $: tileChoices = (id, kind) => ($layout.tile_order[kind] || []).filter(t => !(kind === 'totals' && t === 'hosts' && String($layout.totals_cols) === 'auto' && secW(id) < 1000));
+    // the per-row choices that do something here: no more than fit across the card as it is laid
+    // out (measured by InfraIndex, so a 1/2 or 1/3 card offers fewer), nor than there are tiles
+    $: totCap = Math.max(1, Math.min(totShown.length, totMost));
+    $: colChoices = (id) => COLS.filter(c => +c <= totCap);
+    // the one in effect (a number above what fits shows as the most that do)
+    $: totOn = String(Math.min(+$layout.totals_cols || 4, totCap));
+    $: tileChoices = (id, kind) => $layout.tile_order[kind] || [];
     const isCard = (t) => t.startsWith('h:') || t.startsWith('v:');
     const nameOf = (t) => t.startsWith('h:') ? cardHostName(baseOf(t.slice(2))) : t.startsWith('v:') ? baseOf(t.slice(2)) : label[baseOf(t)] || t;
     // a card or a copy leaves the page; a section itself is hidden (it keeps its place for later)
@@ -524,7 +525,7 @@
     {:else if id === 'attention'}<AttentionRow {now} {pendingUpdates} {updTargets} {backup} hide={$layout.hidden_tiles} order={$layout.tile_order.attention} joins={$layout.tile_joins.attention} onJoin={customizing ? (a, b) => toggleJoin('attention', a, b) : null} onSort={customizing ? (ids) => setTileOrder('attention', ids) : null} />
     {:else if id === 'totals'}
     <!-- the cluster's totals split per host, as on the Infrastructure page -->
-    <div id="sec-totals"><InfraIndex embedded cards={false} bind:rows={totRows} hideTiles={$layout.hidden_tiles} order={$layout.tile_order.totals} joins={$layout.tile_joins.totals} onJoin={customizing ? (a, b) => toggleJoin('totals', a, b) : null} onSort={customizing ? (ids) => setTileOrder('totals', ids) : null} cols={$layout.totals_cols}
+    <div id="sec-totals"><InfraIndex embedded cards={false} bind:rows={totRows} bind:most={totMost} hideTiles={$layout.hidden_tiles} order={$layout.tile_order.totals} joins={$layout.tile_joins.totals} onJoin={customizing ? (a, b) => toggleJoin('totals', a, b) : null} onSort={customizing ? (ids) => setTileOrder('totals', ids) : null} cols={$layout.totals_cols}
             arrakis={{ cpu: live.cpu, mem, disk, cores, os: 'macOS', up: upSince ? (now - upSince) / 1000 : null }}
             vm={{ running: !!vmEngine, cpu: vmCpu, memGb: vmGb, limitGb: pool ? pool.memory_mib / 1024 : null, up: vmEngine?.uptime_seconds }} /></div>
     {:else if id.startsWith('h:')}
@@ -636,8 +637,8 @@
         {#if SECTION_TILES[kind]}
             <span class="grp" data-nodrag role="group" aria-label="Tiles shown">{#each tileChoices(id, kind) as t (t)}<button type="button" class="tg" class:on={!$layout.hidden_tiles.includes(t)} aria-pressed={!$layout.hidden_tiles.includes(t)} title="{$layout.hidden_tiles.includes(t) ? 'Show' : 'Hide'} {tileName[t]}" on:click={() => toggleTile(t)}>{tileName[t]}</button>{/each}</span>
         {/if}
-        {#if kind === 'totals' && colChoices(id).length > 2}
-            <span class="grp" data-nodrag role="group" aria-label="Tiles per row" title="Tiles per row">{#each colChoices(id) as c}<button type="button" class="tg" class:on={String($layout.totals_cols) === String(c)} on:click={() => setTotalsCols(c)}>{c === 'auto' ? 'Fit' : c}</button>{/each}</span>
+        {#if kind === 'totals' && colChoices(id).length > 1}
+            <span class="grp" data-nodrag role="group" aria-label="Tiles per row" title="Tiles per row">{#each colChoices(id) as c}<button type="button" class="tg" class:on={totOn === c} on:click={() => setTotalsCols(c)}>{c}</button>{/each}</span>
         {/if}
         {#if kind === 'shortcuts' || kind === 'host'}<span class="grp" data-nodrag><button type="button" class="tg" title="More settings of {nameOf(id)}" on:click={() => openSettings(id)}><Pencil size={13} /></button></span>{/if}
     {/snippet}
@@ -653,8 +654,8 @@
                     {#if SECTION_TILES[kind]}
                         <i></i><span class="grp" data-nodrag role="group" aria-label="Tiles shown">{#each tileChoices(id, kind) as t (t)}<button type="button" class="tg" class:on={!$layout.hidden_tiles.includes(t)} aria-pressed={!$layout.hidden_tiles.includes(t)} title="{$layout.hidden_tiles.includes(t) ? 'Show' : 'Hide'} {tileName[t]}" on:click={() => toggleTile(t)}>{tileName[t]}</button>{/each}</span>
                     {/if}
-                    {#if kind === 'totals' && colChoices(id).length > 2}
-                        <i></i><span class="grp" data-nodrag role="group" aria-label="Tiles per row" title="Tiles per row">{#each colChoices(id) as c}<button type="button" class="tg" class:on={String($layout.totals_cols) === String(c)} on:click={() => setTotalsCols(c)}>{c === 'auto' ? 'Fit' : c}</button>{/each}</span>
+                    {#if kind === 'totals' && colChoices(id).length > 1}
+                        <i></i><span class="grp" data-nodrag role="group" aria-label="Tiles per row" title="Tiles per row">{#each colChoices(id) as c}<button type="button" class="tg" class:on={totOn === c} on:click={() => setTotalsCols(c)}>{c}</button>{/each}</span>
                     {/if}
                     {#if kind === 'avatar'}
                         <i></i>{#if narrow}<select class="lk" data-nodrag aria-label="Look" value={$layout.cfg[id]?.look || 'visor'} on:change={(e) => setCfg(id, { look: e.currentTarget.value })}>{#each AVATAR_LOOKS as [k, l]}<option value={k}>{l}</option>{/each}</select>{:else}<span class="grp" data-nodrag role="group" aria-label="Look">{#each AVATAR_LOOKS as [k, l]}<button type="button" class="tg" class:on={($layout.cfg[id]?.look || 'visor') === k} on:click={() => setCfg(id, { look: k })}>{l}</button>{/each}</span>{/if}

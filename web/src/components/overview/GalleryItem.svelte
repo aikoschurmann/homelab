@@ -113,7 +113,7 @@
                     <span class="grp" role="group" aria-label="Tiles shown">{#each tiles as t (t)}<button type="button" class:on={!$layout.hidden_tiles.includes(t)} aria-pressed={!$layout.hidden_tiles.includes(t)} title="{$layout.hidden_tiles.includes(t) ? 'Show' : 'Hide'} {tileName[t]}" on:click={() => toggleTile(t)}>{tileName[t]}</button>{/each}</span><i></i>
                 {/if}
                 {#if item.id === 'totals'}
-                    <span class="grp" role="group" aria-label="Tiles per row" title="Tiles per row">{#each COLS as c}<button type="button" class:on={String($layout.totals_cols) === String(c)} on:click={() => setTotalsCols(c)}>{c === 'auto' ? 'Fit' : c}</button>{/each}</span><i></i>
+                    <span class="grp" role="group" aria-label="Tiles per row" title="Tiles per row">{#each COLS as c}<button type="button" class:on={String($layout.totals_cols) === String(c)} on:click={() => setTotalsCols(c)}>{c}</button>{/each}</span><i></i>
                 {/if}
                 {#if item.id === 'shortcuts'}
                     <span class="grp" role="group" aria-label="Pages shown">{#each SHORTCUTS as x (x.id)}<button type="button" class:on={picked.includes(x.id)} aria-pressed={picked.includes(x.id)} title="{picked.includes(x.id) ? 'Hide' : 'Show'} {x.label}" on:click={() => toggleShortcut(x.id)}>{x.label}</button>{/each}</span><i></i>
