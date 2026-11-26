@@ -55,8 +55,11 @@ function tileOrder(o = {}) {
 export const joinKey = (a, b) => [a, b].sort().join('|');
 function tileJoins(j) {
     // 'metrics': metric widgets next to each other, by widget id
-    const def = { totals: [], attention: [joinKey('updates', 'apps'), joinKey('apps', 'backups')], metrics: [] };
-    return Object.fromEntries(Object.keys(def).map(k => [k, Array.isArray(j?.[k]) ? j[k] : def[k]]));
+    const def = { totals: [], attention: [joinKey('updates', 'apps'), joinKey('apps', 'backups')], metrics: [], shortcuts: [] };
+    const out = Object.fromEntries(Object.keys(def).map(k => [k, Array.isArray(j?.[k]) ? j[k] : def[k]]));
+    // host and machine cards don't merge (drop merges saved while they could)
+    out.metrics = out.metrics.filter(k => !k.split('|').some(t => /^[hv]:/.test(t)));
+    return out;
 }
 // how many cluster tiles per row (never more than fit across the section, at ~240px each)
 export const COLS = ['1', '2', '3', '4'];
@@ -192,7 +195,9 @@ export const setPageOrder = (ids) => { overviewPages.update(ps => [ps[0], ...ids
 // Merges belong to a spot between two neighbours, not to the two tiles: after any reorder a
 // merge is kept only if the same two tiles are still side by side, in the same order (the one
 // dragged leaves its merges behind, and two tiles that meet again later don't snap back together).
-const seqOf = (l, kind) => kind === 'metrics' ? l.order.filter(t => !l.hidden.includes(t)).map(t => t.startsWith('m:') ? t.slice(2) : '§' + t)
+// (metrics: the Overview's grid, where a widget goes by its card id and a host card or section by its token)
+const seqOf = (l, kind) => kind === 'metrics' ? l.order.filter(t => !l.hidden.includes(t)).map(t => t.startsWith('m:') ? t.slice(2) : t)
+    : kind === 'shortcuts' ? l.shortcuts || []
     : (l.tile_order[kind] || []).filter(t => !l.hidden_tiles.includes(t));
 const pairs = (s) => new Set(s.slice(1).map((t, i) => s[i] + '|' + t));
 function keepJoins(prev, next) {

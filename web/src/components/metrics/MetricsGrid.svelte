@@ -176,9 +176,18 @@
         beside = b;
     }
     $: cards, cell, gap, at, measure();
+    // …and again whenever an item changes size (charts, host cards and stretched rows settle after
+    // the first layout; measured only then, the merge handles never showed up)
+    let ro;
+    onMount(() => { ro = new ResizeObserver(() => measure()); watchSizes(); return () => ro.disconnect(); });
+    const watchSizes = () => { if (ro && gridEl) for (const e of [gridEl, ...gridEl.children]) ro.observe(e); };
+    afterUpdate(watchSizes);
     // merged with the one before / after it
     $: joins = $layout.tile_joins.metrics;
-    const joinable = (k) => k > 0 && !cards[k].section && !cards[k - 1].section && beside[cards[k].id];
+    // widgets, the avatar and text cards: each one card, so two side by side can become one (host
+    // and machine cards don't merge; the other sections hold several cards or a table of their own)
+    const mergeable = (c) => !c.section || !!SEC_SIZE[baseOf(c.id)];
+    $: joinable = (k) => k > 0 && mergeable(cards[k]) && mergeable(cards[k - 1]) && beside[cards[k].id];
     $: jl = (k) => joinable(k) && joins.includes(joinKey(cards[k - 1].id, cards[k].id));
     $: jr = (k) => k < cards.length - 1 && jl(k + 1);
     $: labelOf = (c) => c.section ? nameOf(c.id) : c.title || $catalog?.metrics.find(m => m.key === c.metric)?.label || c.metric;
@@ -278,14 +287,14 @@
     /* merged with a neighbour: one card, a line between (the slot itself carries .tj-l/.tj-r;
        the card inside loses its corners and left border) */
     .slot:global(.tj-l) { border-left: none !important; }
-    .slot:global(.tj-l) > :global(*) :global(.w), .slot:global(.tj-l) :global(.w), .slot:global(.tj-l) :global(.ui-stat.mb) { border-left: none; border-top-left-radius: 0; border-bottom-left-radius: 0; }
-    .slot:global(.tj-r) :global(.w), .slot:global(.tj-r) :global(.ui-stat.mb) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+    .slot:global(.tj-l) :global(:is(.w, .ui-stat.mb, .sq, .note)) { border-left: none; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+    .slot:global(.tj-r) :global(:is(.w, .ui-stat.mb, .sq, .note)) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
     .slot:global(.tj-l) :global(.flush) { border-bottom-left-radius: 0; }
     .slot:global(.tj-r) :global(.flush) { border-bottom-right-radius: 0; }
     /* dragged (its copy, its place) and whatever it was merged with: cards of their own again */
-    .slot:global(.sort-free) :global(.w), .slot:global(.sort-free) :global(.ui-stat.mb) { border-radius: var(--radius-card, 8px) !important; }
-    :global(.sort-free) + .slot:global(.tj-l) :global(.w), :global(.sort-free) + .slot:global(.tj-l) :global(.ui-stat.mb) { border-top-left-radius: var(--radius-card, 8px); border-bottom-left-radius: var(--radius-card, 8px); }
-    .slot:global(.tj-r):has(+ :global(.sort-free)) :global(.w), .slot:global(.tj-r):has(+ :global(.sort-free)) :global(.ui-stat.mb) { border-top-right-radius: var(--radius-card, 8px); border-bottom-right-radius: var(--radius-card, 8px); }
+    .slot:global(.sort-free) :global(:is(.w, .ui-stat.mb, .sq, .note)) { border-radius: var(--radius-card, 8px) !important; }
+    :global(.sort-free) + .slot:global(.tj-l) :global(:is(.w, .ui-stat.mb, .sq, .note)) { border-top-left-radius: var(--radius-card, 8px); border-bottom-left-radius: var(--radius-card, 8px); }
+    .slot:global(.tj-r):has(+ :global(.sort-free)) :global(:is(.w, .ui-stat.mb, .sq, .note)) { border-top-right-radius: var(--radius-card, 8px); border-bottom-right-radius: var(--radius-card, 8px); }
     /* the merge marker: slots have no border of their own */
     .mgrid :global(.tjb) { left: calc(-0.5 * var(--g)); }
     .mgrid :global(.tj-l > .tjb) { left: -0.5px; }
@@ -294,7 +303,10 @@
     .canvas { --g: 14px; }
     /* the same as a section being customized: a dashed outline around it as it is */
     .ed { position: relative; display: flex; border-radius: var(--radius-card, 8px); cursor: grab; touch-action: none; outline: 1px dashed var(--border-strong); outline-offset: 0; transition: outline-color .12s; }
-    .ed:hover { outline-color: var(--text-secondary); }
+    /* (hovered or with a menu open: above its neighbours, so a merged one's outline isn't hidden
+       under the card beside it on the shared side) */
+    /* (not while the pointer is on its merge handle: that belongs to the gap, not the card) */
+    .ed:hover:not(:has(> .tjb:hover)), .ed:global(.held) { outline-color: var(--text-secondary); z-index: 2; }
     /* one line: the dashed outline sits where the card's own border is */
     .ed :global(.w), .ed :global(.ui-stat) { border-color: transparent; }
     .ed:global(.dragging) { cursor: grabbing; outline: 1px solid var(--accent); box-shadow: 0 14px 34px rgba(0, 0, 0, .35); }
@@ -304,7 +316,7 @@
     /* its tools: the same bar as a section's, on the top edge, half in the gap above; shown
        while hovered or focused (always on touch) */
     .tb { position: absolute; top: 0; width: max-content; display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 2px; border-radius: 8px; background: var(--surface) linear-gradient(var(--highlight-10), var(--highlight-10)); border: 1px solid var(--border-strong); box-shadow: 0 4px 14px rgba(0, 0, 0, .35); z-index: 3; opacity: 0; transform: translateY(calc(-50% + 3px)); pointer-events: none; transition: opacity .12s, transform .12s; cursor: default; }
-    .ed:hover .tb, .ed:focus-within .tb { opacity: 1; transform: translateY(-50%); pointer-events: auto; z-index: 4; }
+    .ed:hover:not(:has(> .tjb:hover)) .tb, .ed:focus-within .tb { opacity: 1; transform: translateY(-50%); pointer-events: auto; z-index: 4; }
     .ed:global(.dragging) .tb { opacity: 0; }
     @media (hover: none) { .tb { opacity: 1; transform: translateY(-50%); pointer-events: auto; } }
     .tb i { width: 1px; height: 14px; margin: 0 3px; background: var(--border-strong); }

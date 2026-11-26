@@ -47,6 +47,7 @@
     import { cloudflare, isActive } from '../lib/cloudflare.js';
     import LiveChart from './ui/LiveChart.svelte';
     import AttentionRow from './overview/AttentionRow.svelte';
+    import ShortcutsCard from './overview/ShortcutsCard.svelte';
     import Tabs from './ui/Tabs.svelte';
     import RackCard from './overview/RackCard.svelte';
     import TextCard from './overview/TextCard.svelte';
@@ -539,16 +540,7 @@
             vm={{ running: !!vmEngine, cpu: vmCpu, memGb: vmGb, limitGb: pool ? pool.memory_mib / 1024 : null, up: vmEngine?.uptime_seconds }} /></div>
     {:else if id === 'tailscale'}<TailscaleCard {peers} />
     {:else if id === 'shortcuts'}
-    <div class="shortcuts" id="sec-databases" style="--n: {Math.max(1, $layout.shortcuts.length)}">
-        {#each $layout.shortcuts as k (k)}
-            {@const c = SC[k]}
-            <a class="sc" href={c.to}>
-                <span class="sc-ic"><svelte:component this={c.icon} size={16} /></span>
-                <span class="sc-main"><span class="sc-k">{c.k}</span><span class="sc-v">{c.v} <small>{#if c.v && c.s}<i class="sep">{'· '}</i>{/if}{c.s}</small></span></span>
-                <ArrowRight size={14} class="sc-go" />
-            </a>
-        {:else}<div class="ui-card ui-empty">No shortcuts picked. Add some under Customize.</div>{/each}
-    </div>
+    <ShortcutsCard items={$layout.shortcuts.map(k => ({ key: k, ...SC[k] }))} joins={$layout.tile_joins.shortcuts} onJoin={customizing ? (a, b) => toggleJoin('shortcuts', a, b) : null} />
     {:else if id === 'compute'}<ComputeCard />
     {:else if id === 'uptime'}<UptimeCard />
     {:else if id === 'pihole'}<PiholeCard />
@@ -780,22 +772,7 @@
     .pair .msr > :global(*) { flex: 1; }
 
 
-    /* shortcuts */
-    /* as many across as fit (at least 220px each), never more than there are */
-    /* beside something taller (Tailscale, say) the tiles share its height rather than leave a gap under them */
-    .shortcuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(220px, calc((100% - 36px) / min(var(--n), 4))), 1fr)); grid-auto-rows: 1fr; gap: 12px; align-content: stretch; }
-    .ts-row .shortcuts { grid-auto-rows: 1fr; }
     .ts-row.single { grid-template-columns: 1fr; }
-    .ts-row.single .shortcuts { grid-template-columns: repeat(2, 1fr); }
-    .sc { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 8px); text-decoration: none; color: var(--text-primary); transition: border-color .12s, box-shadow .12s; min-width: 0; }
-    .sc:hover { border-color: var(--border-strong); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05); }
-    .sc-ic { width: 36px; height: 36px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .sc-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-    .sc-k { font-size: 12.5px; color: var(--text-secondary); }
-    .sc-v { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sc-v small { font-size: 12.5px; font-weight: 400; color: var(--text-secondary); }
-    .sc :global(.sc-go) { color: var(--text-secondary); flex-shrink: 0; transition: transform .12s; }
-    .sc:hover :global(.sc-go) { color: var(--accent); transform: translateX(2px); }
 
 
     /* api latency */
@@ -868,9 +845,6 @@
     .lat-chip.on .rk, .lat-chip:hover .rk { background: var(--accent); color: var(--surface); }
 
 
-    /* the detail sits under the figure (it trailed off on one line in narrow tiles) */
-    .sc-v small { display: block; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sc-v .sep { display: none; }
     /* laptop widths: the metric tabs get narrow, so the value drops its "of 16 GB" and shrinks a step */
     @media (max-width: 1200px) {
         .mt-value { font-size: 20px; }
@@ -897,7 +871,6 @@
         .mt-range .ui-seg { width: 100%; }
         .mt-range .ui-seg button { flex: 1; }
         .chart { padding: 14px 8px 4px; }
-        .shortcuts, .ts-row.single .shortcuts { grid-template-columns: 1fr; }
         .lat { grid-template-columns: 1fr; }
         .lat-hero { border-right: none; border-bottom: 1px solid var(--border); padding: 16px 14px; }
         .lat-v { font-size: 26px; }

@@ -127,7 +127,7 @@
     .att { --g: 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--g); }
     .cell { display: flex; flex-direction: column; gap: 6px; padding: 16px 20px; min-width: 0; text-decoration: none; color: inherit; transition: background .12s; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 8px); }
     .sorting { pointer-events: auto; }
-    .cell:hover { background: var(--highlight-3); }
+    .cell:hover:not(:has(> .tjb:hover)) { background: var(--highlight-3); }
     .bad { color: var(--red); }
     .att .ui-segbar { margin-top: 2px; }
     /* one thin cell per day, same height as the bars beside it */

@@ -207,7 +207,7 @@ a.ui-btn { text-decoration: none; }
 /* Customize: a tile can be dragged (tinted on hover) and the gap/line before it toggled */
 .tsort > [data-id] { position: relative; cursor: grab; }
 /* (a tint, not an outline: an outline would cut across a merged card's line and corners) */
-.tsort > [data-id]:hover { background-image: linear-gradient(var(--highlight-10), var(--highlight-10)); }
+.tsort > [data-id]:hover:not(:has(> .tjb:hover)) { background-image: linear-gradient(var(--highlight-10), var(--highlight-10)); }
 .tjb { position: absolute; top: 10px; bottom: 10px; left: calc(-0.5 * var(--g, 12px) - 1px); width: 16px; transform: translateX(-50%); z-index: 2; padding: 0; border: none; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 /* (measured from inside the tile's 1px border; on a merged line, on the line's middle) */
 .tj-l > .tjb { left: -0.5px; }
