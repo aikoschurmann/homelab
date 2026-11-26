@@ -180,18 +180,36 @@ function closeRows(out) {
 // size takes the moved one's old place (a swap); anything else moves down as far as it must.
 // Always worked out from the layout as it was when the drag began, so when the widget moves on,
 // the others go back.
-export function pushLayout(snap, id, x, y, n) {
+export function pushLayout(snap, id, x, y, n, pcx = null) {
     const me = snap[id];
     const at = { ...me, x: Math.max(0, Math.min(n - me.w, x)), y: Math.max(0, y) };
     const out = { [id]: at };
     const others = Object.entries(snap).filter(([k]) => k !== id).sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x);
+    // the pointer over an empty cell, the widget's edge just over a neighbour (the drop cell is
+    // rounded from that edge): it slides to the free spot under the pointer instead of pushing
+    // the neighbour down a row. Only with the pointer on the neighbour itself does it push.
+    const blocked = (p) => others.some(([, o]) => hit(o, p));
+    if (pcx != null && me.w < n && blocked(at) && !blocked({ x: pcx, y: at.y, w: 1, h: 1 })) {
+        const near = [...Array(n - at.w + 1).keys()].filter(x => x <= pcx && pcx < x + at.w && !blocked({ ...at, x }))
+            .sort((a, b) => Math.abs(a - at.x) - Math.abs(b - at.x))[0];
+        if (near != null) at.x = near;
+    }
     const inWay = others.filter(([, o]) => hit(o, at));
     // (not a whole-row item: those insert where they're dropped, the rest moving down, as a list does)
     if (me.w < n && inWay.length === 1 && inWay[0][1].w === me.w && inWay[0][1].h === me.h && !hit(me, at)) out[inWay[0][0]] = { ...inWay[0][1], x: me.x, y: me.y };
     for (const [k, o] of others) {
         if (out[k]) continue;
         const p = { ...o };
-        while (Object.values(out).some(q => hit(p, q))) p.y++;
+        const taken = (q) => Object.values(out).some(r => hit(q, r)) || others.some(([j, r]) => j !== k && !out[j] && hit(q, r));
+        if (Object.values(out).some(q => hit(p, q))) {
+            // room on its own row: it slides along it (the side the moved one isn't on first),
+            // as Apple's widgets do; only with no room does it go down a row
+            const side = o.x + o.w / 2 >= at.x + at.w / 2 ? 1 : -1;
+            const xs = [...Array(n - p.w + 1).keys()].filter(x => !taken({ ...p, x }))
+                .sort((a, b) => Math.abs(a - o.x) - Math.abs(b - o.x) || (b - a) * side);
+            if (xs.length) p.x = xs[0];
+            else while (Object.values(out).some(q => hit(p, q))) p.y++;
+        }
         out[k] = p;
     }
     return out;

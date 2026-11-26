@@ -119,8 +119,10 @@ export function sortable(node, opts) {
         // the cell its top-left corner is nearest, where it was picked up kept under the pointer
         const x = Math.max(0, Math.min(n - Math.min(w, n), Math.round((px - offX - b.left) / (unit + gap))));
         const y = g.__rowAt ? g.__rowAt(py - offY) : Math.max(0, Math.round((py - offY - b.top) / (unit + gap)));
-        const key = x + ',' + y;
-        const go = () => { gridCand = ''; if (!el) return; lastCell = key; activeGrid = g; g.__moveTo(el.dataset.mid, x, y); };
+        // (the column under the pointer: a widget whose edge is just over a neighbour goes beside it)
+        const pcx = Math.max(0, Math.min(n - 1, Math.floor((px - b.left + gap / 2) / (unit + gap))));
+        const key = x + ',' + y + ',' + pcx;
+        const go = () => { gridCand = ''; if (!el) return; lastCell = key; activeGrid = g; g.__moveTo(el.dataset.mid, x, y, pcx); };
         if (key === lastCell) { clearTimeout(gridTimer); gridCand = ''; }
         else if (now) { clearTimeout(gridTimer); go(); }
         else if (key !== gridCand) { gridCand = key; clearTimeout(gridTimer); gridTimer = setTimeout(go, DWELL); }

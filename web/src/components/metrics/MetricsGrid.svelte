@@ -109,11 +109,11 @@
     // tall as the tallest in it, and everything in the row stretches to that)
     const place = (p, fit = false) => `grid-column: ${p.x + 1} / span ${p.w}; grid-row: ${p.y + 1} / span ${p.h}` + (fit ? '' : `; min-height: ${Math.round(cell.unit * p.h + gap * (p.h - 1))}px`);
     // called by the drag (lib/sortable.js): the widget is over cell (x, y); null: it left the grid
-    function moveTo(mid, x, y) {
+    function moveTo(mid, x, y, pcx) {
         if (mid == null) { preview = null; snap = null; rowCache = null; return; }
         if (!snap) snap = base;
         if (!snap[mid]) return;
-        preview = pushLayout(snap, mid, x, y, cell.n);
+        preview = pushLayout(snap, mid, x, y, cell.n, pcx);
     }
     // let go: every widget of this grid keeps its place (for this grid size), and the run takes
     // their reading order (what a narrower screen lays out)
