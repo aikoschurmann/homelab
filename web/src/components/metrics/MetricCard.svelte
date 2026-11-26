@@ -38,7 +38,9 @@
     let data = null, loading = true, timer;
     async function load() {
         if (!nodes.length) { data = null; loading = false; return; }
-        data = await fetchSeries(card.metric, nodes, rng);
+        // (bars: the hosts' average and peak from the server, at a one-minute grain)
+        const agg = card.type !== 'bars' ? null : card.metric === 'cpu' ? 'cores' : additive(meta?.unit) || CAP[card.metric] ? 'sum' : 'avg';
+        data = await fetchSeries(card.metric, nodes, rng, agg);
         loading = false;
     }
     $: card.metric, nodes.join(','), rng, cat && (loading = true, load());
@@ -109,32 +111,68 @@
     // bars: one bar split by host, biggest first, parts in shades of the metric's colour.
     // Amounts that add up (memory, storage, traffic) show the total; % and °C the average.
     const SHADES = [1, 0.7, 0.5, 0.35, 0.25];
-    $: live = series.filter(s => s.last?.v != null).sort((a, b) => b.last.v - a.last.v).map((s, i) => ({ ...s, shade: SHADES[Math.min(i, SHADES.length - 1)] }));
+    // (CPU biggest first by cores busy, as the cluster tile, not by its own %)
+    $: liveKey = (s) => card.metric === 'cpu' && capOf(s.node) ? s.last.v * capOf(s.node) : s.last.v;
+    $: live = series.filter(s => s.last?.v != null).sort((a, b) => liveKey(b) - liveKey(a)).map((s, i) => ({ ...s, shade: SHADES[Math.min(i, SHADES.length - 1)] }));
     $: sum = live.reduce((a, s) => a + s.last.v, 0);
     $: adds = additive(unit);
-    $: barVal = adds ? sum : (live.length ? sum / live.length : null);
-    $: [bv, bu] = parts(barVal, unit);
+    // CPU, memory and storage: against what the hosts have in all (cores, GB), as the cluster
+    // tiles: CPU in use is the cores busy of all cores, not an average of the hosts' percentages.
+    // Shown as a percentage or as the amount (cores / GB); the card's `show`.
+    const CAP = { cpu: 'cores', mem: 'mem', disk: 'disk' };
+    $: capOf = (n) => CAP[card.metric] ? +cat?.caps?.[n]?.[CAP[card.metric]] || 0 : 0;
+    $: capped = card.type === 'bars' && live.length > 0 && live.every(s => capOf(s.node) > 0);
+    // a host's share in amounts: cores busy for CPU (its % of its cores), else the value itself
+    $: amt = (node, v) => card.metric === 'cpu' ? v / 100 * capOf(node) : v;
+    $: capTot = capped ? live.reduce((a, s) => a + capOf(s.node), 0) : 0;
+    $: used = capped ? live.reduce((a, s) => a + amt(s.node, s.last.v), 0) : 0;
+    $: pctMode = capped && (card.show || (card.metric === 'cpu' ? 'pct' : 'total')) === 'pct';
+    // an amount as text: cores to two places (0.1 below that), else in the metric's unit
+    $: fa = (v, short = false) => card.metric === 'cpu' ? `${short ? (v < 0.1 ? '<0.1' : v.toFixed(1)) : v.toFixed(2)} cores` : fmt(v, unit);
+    $: capText = card.metric === 'cpu' ? `${Math.round(capTot)} cores` : fmt(capTot, unit);
+    $: barVal = capped ? (pctMode ? (capTot ? used / capTot * 100 : 0) : used) : adds ? sum : (live.length ? sum / live.length : null);
+    // (the unit at full size, as the tiles: "16.3%", "20.1 GB")
+    $: bigText = barVal == null ? '—' : capped && pctMode ? barVal.toFixed(1) + '%' : capped && card.metric === 'cpu' ? barVal.toFixed(2) : fmt(barVal, capped && pctMode ? 'pct' : unit);
+    // what the figure is of, beside it (as the tiles: "3.90 of 24 cores", "of 35.7 GB")
+    $: barOf = !capped ? (live.length > 1 ? (adds ? `total of ${live.length} hosts` : `average of ${live.length} hosts`) : live[0]?.name || '')
+        : pctMode ? `${card.metric === 'cpu' ? used.toFixed(2) : fmt(used, unit)} of ${capText}` : `of ${capText}`;
+    // each host in the legend: its own % (of its cores / memory), or its amount
+    $: hostText = (s) => !capped ? fmt(s.last.v, unit) : pctMode ? fmt(card.metric === 'cpu' ? s.last.v : s.last.v / capOf(s.node) * 100, 'pct') : fa(amt(s.node, s.last.v), true);
     // over the range: the hosts' total (or average) through time, each host's latest value carried
     // forward, so its average and peak are of the whole, not each host's added up
     $: barStats = (() => {
         if (card.type !== 'bars' || !live.length) return null;
+        // the server's, worked out minute by minute (cores busy for CPU), when every host is in it
+        const sa = data?.agg;
+        if (sa && (card.metric !== 'cpu' || capped)) {
+            const cv = (v) => capped && pctMode ? (capTot ? v / capTot * 100 : 0) : v;
+            return { avg: cv(sa.avg), peak: Math.max(cv(sa.peak), barVal ?? -Infinity) };
+        }
         // one host: its own average and peak
-        if (live.length === 1) { const a = avgOf(live[0].points); return a == null ? null : { avg: a, peak: live[0].max ?? a }; }
-        const ev = live.flatMap((s, i) => (s.points || []).filter(p => p[1] != null).map(p => [p[0], i, p[1]])).sort((a, b) => a[0] - b[0]);
+        if (live.length === 1 && !capped) { const a = avgOf(live[0].points); return a == null ? null : { avg: a, peak: live[0].max ?? a }; }
+        const ev = live.flatMap((s, i) => (s.points || []).filter(p => p[1] != null).map(p => [p[0], i, capped ? amt(s.node, p[1]) : p[1]])).sort((a, b) => a[0] - b[0]);
         const last = new Array(live.length).fill(null), agg = [];
         for (let k = 0; k < ev.length; k++) {
             last[ev[k][1]] = ev[k][2];
             if (k + 1 < ev.length && ev[k + 1][0] === ev[k][0]) continue;
             if (last.some(v => v == null)) continue;      // (from when every host has reported)
             const t = last.reduce((a, b) => a + b, 0);
-            agg.push(adds ? t : t / last.length);
+            agg.push(capped ? (pctMode ? t / capTot * 100 : t) : adds ? t : t / last.length);
         }
         if (!agg.length) return null;
-        return { avg: agg.reduce((a, b) => a + b, 0) / agg.length, peak: Math.max(...agg) };
+        // (the peak at least the figure now: the history is minute averages, the figure a live sample)
+        return { avg: agg.reduce((a, b) => a + b, 0) / agg.length, peak: Math.max(...agg, barVal ?? -Infinity) };
     })();
     // a share of the bar: of the total, or (averaged kinds) of the hosts' full scale
-    $: share = (v) => adds ? (sum ? v / sum * 100 : 0) : v / ((scaleMax(unit) || 100) * Math.max(1, live.length)) * 100;
+    $: share = (s) => capped ? (capTot ? amt(s.node, s.last.v) / capTot * 100 : 0) : adds ? (sum ? s.last.v / sum * 100 : 0) : s.last.v / ((scaleMax(unit) || 100) * Math.max(1, live.length)) * 100;
+    $: statText = (v) => capped && !pctMode ? fa(v) : fmt(v, capped ? 'pct' : unit);
     $: mc = metricColor(card.metric);
+
+    let bw = 300, bh = 200;
+    // big: the figure (its unit apart, smaller) as large as the card's room allows, by height and by
+    // its own width in characters
+    $: [bigNum, bigUnit] = (() => { const m = /^([<\d.,—-]+)\s*(.*)$/.exec(bigText || ''); return m ? [m[1], m[2]] : [bigText, '']; })();
+    $: bigPx = Math.round(Math.max(28, Math.min(88, (bh - 170) * 0.6, (bw - 32) / (bigNum.length * 0.6 + bigUnit.length * 0.3 + 0.1))));
 
     const EMPTY = {
         net_rx: 'Agents send this from version 19.', net_tx: 'Agents send this from version 19.', net: 'Agents send this from version 19.',
@@ -146,29 +184,39 @@
 <svelte:window on:click={() => rOpen = false} on:scroll|capture={() => rOpen = false} on:resize={() => rOpen = false} on:keydown={(e) => e.key === 'Escape' && (rOpen = false)} />
 
 {#if card.type === 'bars'}
-<!-- bars: the Overview's own cluster tile (ui-stat), one bar split by host, its legend under it -->
-<!-- laid out as a one-host graph: title and range, the big figure, what it is with its average
-     and peak, then (where the graph would be) one bar split by host and its legend -->
-<div class="ui-stat mb">
-    <div class="hd"><span class="t">{title}</span><span class="m">{rangeLabel}</span></div>
+<!-- bars: the cluster totals' look (label, figure "of" what, a thin bar split by host), the
+     figure as large as the card allows -->
+<div class="ui-stat mb" bind:clientWidth={bw} bind:clientHeight={bh}>
+    <div class="mhd">
+        <span class="ui-stat-label">{title}</span>
+        {#if editable}
+            <button class="rb" class:on={rOpen} bind:this={rBtn} title="Time range" on:click|stopPropagation={toggleRange}>{rangeLabel}<ChevronDown size={12} /></button>
+        {:else}<span class="ui-stat-sub">{rangeLabel}</span>{/if}
+    </div>
     {#if !has}
         <div class="empty"><span>{loading ? 'Loading…' : 'No data yet'}</span>{#if !loading && EMPTY[card.metric]}<small>{EMPTY[card.metric]}</small>{/if}</div>
     {:else}
-        <div class="big">{bv}<small>{bu}</small></div>
-        <div class="sub">{#if live.length > 1}{adds ? `total of ${live.length} hosts` : `average of ${live.length} hosts`}{:else}{live[0]?.name}{/if}{#if barStats}{' · '}avg {fmt(barStats.avg, unit)} · peak {fmt(barStats.peak, unit)}{/if}</div>
-        <div class="bb">
-            <div class="ui-segbar" title={live.map(s => `${s.name}: ${fmt(s.last.v, unit)}`).join('\n')}>
-                {#each live as s (s.node)}<i style="width: {Math.min(100, share(s.last.v))}%; background: {mc}; opacity: {s.shade}"></i>{/each}
-            </div>
-            <span class="ui-stat-sub ui-legend">{#each live.slice(0, 3) as s (s.node)}<span><b style="background: {mc}; opacity: {s.shade}"></b>{s.name} {fmt(s.last.v, unit)}</span>{/each}{#if live.length > 3}<span>+{live.length - 3} more</span>{/if}</span>
+        <!-- the figure grows with the card, centred in what's left; what it is of and its range's
+             average and peak right under it; the bar and its hosts along the bottom -->
+        <div class="bigc">
+            <span class="bn" style="font-size: {bigPx}px">{bigNum}{#if bigUnit}<small>{bigUnit}</small>{/if}</span>
+            <span class="bof">{barOf}</span>
+            {#if barStats}<span class="ui-stat-sub">avg {statText(barStats.avg)} · peak {statText(barStats.peak)}</span>{/if}
+        </div>
+        <div class="foot">
+            <div class="ui-segbar sb" title={live.map(s => `${s.name}: ${hostText(s)}`).join('\n')}>{#each live as s (s.node)}<i style="width: {Math.min(100, share(s))}%; background: {mc}; opacity: {s.shade}"></i>{/each}</div>
+            <span class="ui-stat-sub ui-legend">{#each live as s (s.node)}<span><b style="background: {mc}; opacity: {s.shade}"></b>{s.name}<em>{hostText(s)}</em></span>{/each}</span>
         </div>
     {/if}
 </div>
+{#if rOpen}
+    <span class="rpick" use:portal style={rPos} role="menu" tabindex="-1" on:click|stopPropagation on:keydown={() => {}}>{#each RANGES as [r, l]}<button role="menuitemradio" aria-checked={r === rng} class:on={r === rng} on:click={() => { rOpen = false; pickRange(r); }}>{l}</button>{/each}</span>
+{/if}
 {:else}
 <div class="w k-{card.type}" class:sq bind:clientWidth={tw} bind:clientHeight={th}>
     {#if !sq}
     <div class="hd">
-        <span class="t">{title}</span>
+        <span class="t">{title}{#if net && !tabs && one}<span class="hn">&nbsp;· {one.name}</span>{/if}</span>
         <span class="m">{#if card.type === 'line'}
             <!-- its time range, picked right here -->
             {#if editable}
@@ -225,6 +273,7 @@
     /* the tile: the dashboard's card surface, roomy and quiet */
     .w { position: relative; display: flex; flex-direction: column; gap: 6px; height: 100%; min-height: 0; overflow: hidden; box-sizing: border-box; padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 8px); min-width: 0; }
     .hd { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+    .hn { font-weight: 400; opacity: .75; }
     .t { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     /* the time range: the label as a quiet button; a click opens one solid row of ranges */
     .rb { display: inline-flex; align-items: center; gap: 2px; height: 22px; padding: 0 4px 0 7px; margin: -4px -6px -4px 0; border-radius: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
@@ -267,11 +316,22 @@
     .gcap span, .gcap b { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .gcap span { font-size: 11.5px; color: var(--text-secondary); }
 
-    /* bars: as tall as the row it sits in, like the Overview's tiles */
-    .mb { height: 100%; box-sizing: border-box; overflow: hidden; padding: 18px 20px; gap: 6px; }
-    /* the bar and its legend at the bottom, where a graph's plot would be */
-    .bb { margin-top: auto; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-    .bb .ui-segbar { height: 8px; }
+    /* bars: a cluster tile (ui-stat's padding), as tall as the row it sits in */
+    .mb { height: 100%; box-sizing: border-box; overflow: hidden; position: relative; gap: 10px; }
+    .mhd { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; height: 18px; }
+    .mhd .ui-stat-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mhd .ui-stat-sub { white-space: nowrap; }
+    .mhd .rb { margin: 0 -6px 0 0; }
+    .sb { height: 5px; flex-shrink: 0; }
+    .ui-legend em { font-style: normal; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+    /* the figure centred in what's left, the bar and hosts along the bottom */
+    .bigc { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; overflow: hidden; }
+    .bn { font-weight: 600; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-primary); margin: 0 0 8px -0.04em; }
+    .bn small { font-size: .42em; font-weight: 500; letter-spacing: 0; color: var(--text-secondary); margin-left: .12em; }
+    .bof { font-size: 13px; color: var(--text-primary); opacity: .85; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .foot { display: flex; flex-direction: column; gap: 9px; }
+    .foot .ui-legend { gap: 3px 14px; }
+    .foot .ui-legend em { margin-left: 1px; }
 
     /* line: each host's value now (the legend), then the plot */
     .lg { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }

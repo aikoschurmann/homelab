@@ -113,7 +113,8 @@
         // mirrored: upload above, download below zero (no line drawn at zero)
         const zero = (lines) => lines;
         const span = to - from;
-        const tooltip = { confine: true,
+        const tooltip = { appendTo: 'body',     // (on the page's body: a card's edge can't cut it off)
+               
                 trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: txt, opacity: 0.45, type: [3, 3] } },
                 backgroundColor: css('var(--surface)'), borderColor: css('var(--border)'), textStyle: { color: css('var(--text-primary)'), fontSize: 12 },
                 formatter: (ps) => {

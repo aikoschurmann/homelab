@@ -319,7 +319,9 @@ function keepLatest(key, d) {
     }
     return d;
 }
-export function fetchSeries(key, nodes, range) {
+// agg: also the hosts together over the range at a one-minute grain (sum, avg, or cores busy): its
+// average and peak, so a longer range never shows a lower peak than a shorter one
+export function fetchSeries(key, nodes, range, agg = null) {
     if (key === NET) {
         // each host's download, with its upload alongside
         return Promise.all([fetchSeries('net_rx', nodes, range), fetchSeries('net_tx', nodes, range)]).then(([rx, tx]) => {
@@ -330,7 +332,7 @@ export function fetchSeries(key, nodes, range) {
             return { ...base, key: NET, unit: 'bps', series: nodesAll.map(n => ({ ...((rx?.series || []).find(s => s.node === n) || { node: n, ...none }), up: up[n] || none })) };
         });
     }
-    const q = `key=${encodeURIComponent(key)}&range=${range}${nodes?.length ? '&nodes=' + nodes.map(encodeURIComponent).join(',') : ''}`;
+    const q = `key=${encodeURIComponent(key)}&range=${range}${nodes?.length ? '&nodes=' + nodes.map(encodeURIComponent).join(',') : ''}${agg ? '&agg=' + agg : ''}`;
     const hit = cache.get(q);
     if (hit && Date.now() - hit.at < 30000) return hit.p.then(d => keepLatest(key, d));
     const p = fetch('/api/metrics/series?' + q).then(r => r.json()).then(j => j.status === 'success' ? j.data : null).catch(() => null);
@@ -378,6 +380,8 @@ function norm(l) {
             title: typeof c.title === 'string' ? c.title.slice(0, 60) : '',
             // its own time range (null: the layout's)
             range: RANGES.some(r => r[0] === c.range) ? c.range : null,
+            // bars of CPU, memory or storage: as a percentage or as the amount (cores, GB)
+            ...(c.show === 'pct' || c.show === 'total' ? { show: c.show } : {}),
             // its width and height on the Overview's grid (set in its bar; dimsOf checks them against its sizes)
             ...(typeof c.w === 'string' && c.w in SIXTHS ? { w: c.w } : {}),
             ...([1, 2].includes(+c.h) ? { h: +c.h } : {}),

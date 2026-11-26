@@ -22,6 +22,8 @@
 
     // a widget's settings, right in its bar (no dialog): kind, size, hosts, time range
     const KIND_ICON = { line: ChartLine, bars: ChartBarStacked, gauge: Gauge };
+    // what a CPU, memory or storage bar can show: of all the hosts' cores / memory / storage
+    const SHOWS = { cpu: [['pct', '%'], ['total', 'Cores']], mem: [['pct', '%'], ['total', 'GB']], disk: [['pct', '%'], ['total', 'Size']] };
     $: metaOf = (c) => $catalog?.metrics.find(m => m.key === c.metric);
     $: availOf = (c) => metaOf(c)?.nodes || [];
     $: hname = (n) => $catalog?.names?.[n] || n;
@@ -193,6 +195,11 @@
                     {#if c.section && tools}<i></i>{@render tools(c.id)}{/if}
                     {#if !c.section && kindsFor(metaOf(c)).length > 1}
                         <i></i><span class="grp" data-nodrag role="group" aria-label="Kind">{#each TYPES.filter(([t]) => kindsFor(metaOf(c)).includes(t)) as [t, l] (t)}<button type="button" class="ic" class:on={c.type === t} aria-pressed={c.type === t} title={l} on:click={() => setKind(c, t)}><svelte:component this={KIND_ICON[t]} size={14} /></button>{/each}</span>
+                    {/if}
+                    {#if !c.section && c.type === 'bars' && SHOWS[c.metric]}
+                        <!-- CPU, memory, storage: a percentage or the amount, of what the hosts have in all -->
+                        {@const cur = c.show || (c.metric === 'cpu' ? 'pct' : 'total')}
+                        <i></i><span class="grp" data-nodrag role="group" aria-label="Show as">{#each SHOWS[c.metric] as [k, l] (k)}<button type="button" class="tg" class:on={cur === k} aria-pressed={cur === k} on:click={() => setCard(c.id, { show: k })}>{l}</button>{/each}</span>
                     {/if}
                     {#if widthsFor(c.type).length > 1}
                         <i></i><button type="button" class="dd" class:on={menu?.id === c.id && menu.kind === 'w'} data-nodrag title="Width" on:click|stopPropagation={(e) => openMenu(e, c, 'w')}>{WIDTH_NAMES[c.wk]}<ChevronDown size={12} /></button>
