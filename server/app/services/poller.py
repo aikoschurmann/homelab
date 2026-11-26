@@ -68,7 +68,7 @@ def poll_services_loop():
                         elif line.startswith('MEM:'):
                             with global_state.lock:
                                 if global_state.stats and "vm" in global_state.stats: global_state.stats["vm"]["details"]["Memory"] = line[4:]
-            except: pass
+            except Exception: pass
 
             parsed = parse_arrakis_native()
             
@@ -81,7 +81,7 @@ def poll_services_loop():
                         p = line.split()
                         if len(p) >= 3:
                             ssh_list.append({"user": p[0], "tty": p[1], "ip": (p[2] if p[2] != '-' else "localhost").strip('()'), "is_dash": 'agy' in line or 'server.py' in line or 'main.py' in line})
-            except: ssh_list = []
+            except Exception: ssh_list = []
                 
             # VM SSH
             try:
@@ -92,7 +92,7 @@ def poll_services_loop():
                         p = line.split()
                         if len(p) >= 3:
                             vm_ssh_list.append({"user": p[0], "tty": p[1], "ip": (p[2] if p[2] != '-' else "localhost").strip('()'), "is_dash": 'agy' in line or 'server.py' in line})
-            except: vm_ssh_list = []
+            except Exception: vm_ssh_list = []
                 
             # Tailscale
             try:
@@ -113,19 +113,19 @@ def poll_services_loop():
                     last_seen = peer.get('LastSeen', '')
                     if last_seen.startswith('0001-'): last_seen = ''
                     ts_list.append({"ip": peer.get('TailscaleIPs', [''])[0], "host": name, "os": peer.get('OS', ''), "state": state, "last_seen": last_seen})
-            except: ts_list = []
+            except Exception: ts_list = []
                 
             parsed['connections'] = {"host_ssh": ssh_list, "vm_ssh": vm_ssh_list, "tailscale": ts_list}
             
             try:
                 from app.api.system import fetch_host_daemons_data
                 parsed['daemons'] = fetch_host_daemons_data()
-            except: parsed['daemons'] = []
+            except Exception: parsed['daemons'] = []
             
             try:
                 from app.api.system import fetch_vm_containers_data
                 parsed['containers'] = fetch_vm_containers_data()
-            except: parsed['containers'] = []
+            except Exception: parsed['containers'] = []
             
             with global_state.lock:
                 if global_state.stats and "host" in global_state.stats:
@@ -171,7 +171,7 @@ def poll_background_loop():
                                 formatted_errors.append(f"<span style=\'color:#7dc4e4;\'>[{html.escape(name)}]</span> <span style=\'color:var(--text-secondary);\'>{clean}</span>")
                 with global_state.lock:
                     global_state.bg['logs_vm'] = '<br>'.join(formatted_errors[-20:]) if formatted_errors else "<span style='color:#a6da95;'>No recent container errors found.</span>"
-            except: pass
+            except Exception: pass
         except Exception as e: log.error(f"Background loop error: {e}")
         time.sleep(300)
 
@@ -191,29 +191,29 @@ def poll_db_loop():
             if stats:
                 host = stats.get('host', {})
                 try: h_cpu = float(str(host.get('details', {}).get('CPU Usage', '0')).replace('%', ''))
-                except: h_cpu = 0.0
+                except Exception: h_cpu = 0.0
                 try: h_mem = float(host.get('details', {}).get('Memory', '0G / 0G').split(' / ')[0].replace('G', ''))
-                except: h_mem = 0.0
+                except Exception: h_mem = 0.0
                 try: h_net = history_net[-1] if history_net else 0.0
-                except: h_net = 0.0
+                except Exception: h_net = 0.0
                 insert_metrics('arrakis', h_cpu, h_mem, h_net)
                 
                 vm = stats.get('vm', {})
                 try: v_cpu = float(str(vm.get('details', {}).get('CPU Usage', '0')).replace('%', ''))
-                except: v_cpu = 0.0
+                except Exception: v_cpu = 0.0
                 try: v_mem = float(vm.get('details', {}).get('Memory', '0G / 0G').split(' / ')[0].replace('G', ''))
-                except: v_mem = 0.0
+                except Exception: v_mem = 0.0
                 insert_metrics('sietch', v_cpu, v_mem, 0.0)
                 
                 try:
                     for d in stats.get('daemons', []):
                         insert_service_metric('daemon', d['id'], float(d.get('mem_mb') or 0), float(d.get('cpu') or 0), d.get('status'))
-                except: pass
+                except Exception: pass
 
                 try:
                     for c in stats.get('containers', []):
                         insert_service_metric('container', c['id'], float(c.get('mem_mb') or 0), float(c.get('cpu') or 0), c.get('status'))
-                except: pass
+                except Exception: pass
 
                 # VM shares the host disk (see arrakis_parser), so one series covers both cards
                 if time.time() - last_disk >= DISK_SAMPLE_SECONDS:
@@ -229,7 +229,7 @@ def poll_db_loop():
             if os.path.exists(prefs_file):
                 with open(prefs_file, 'r') as f:
                     interval = int(json.load(f).get('db_poll_interval', 10))
-        except: pass
+        except Exception: pass
         
         now = time.time()
         if now - last_cleanup > 3600:

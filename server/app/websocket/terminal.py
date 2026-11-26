@@ -130,8 +130,8 @@ def register_websocket(sock):
         finally:
             try:
                 os.close(master)
-            except: pass
+            except Exception: pass
             try:
                 p.wait(timeout=1)
-            except:
+            except Exception:
                 p.kill()

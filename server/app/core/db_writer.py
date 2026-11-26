@@ -42,7 +42,7 @@ class DBWriter:
                 if conn:
                     try:
                         conn.close()
-                    except: pass
+                    except Exception: pass
                     conn = None
                 time.sleep(1)
 

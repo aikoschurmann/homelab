@@ -490,7 +490,7 @@ def handle_prefs():
                         if prefs.get(k):
                             prefs[k] = _mask(prefs[k])
                     return jsonify({"status": "success", "data": prefs})
-        except:
+        except Exception:
             pass
         return jsonify({"status": "success", "data": {}})
 
@@ -650,12 +650,12 @@ def fetch_host_daemons_data():
                             services[idx]['mem_mb'] = round(mem_info.rss / (1024 * 1024), 1)
                         else:
                             services[idx]['mem_mb'] = 0.0
-                    except:
+                    except Exception:
                         pass
                         
                     try:
                         services[idx]['cpu'] = p.cpu_percent(interval=None)
-                    except:
+                    except Exception:
                         pass
 
                     # Root-owned daemons (e.g. tailscaled) deny psutil memory/cpu reads; ps can still see them
@@ -782,7 +782,7 @@ def fetch_vm_containers_data():
                     c_data["cpu"] = stats_map[name]["cpu"]
                     
                 services.append(c_data)
-            except: pass
+            except Exception: pass
         return services
     except Exception as e:
         from app.core.logger import log
