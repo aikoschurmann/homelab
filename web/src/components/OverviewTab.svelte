@@ -803,7 +803,7 @@
     .lat-k { font-size: 12.5px; color: var(--text-secondary); font-weight: 500; }
     .lat-v { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; color: var(--text-primary); font-variant-numeric: tabular-nums; line-height: 1.1; }
     .lat-s { font-size: 12.5px; color: var(--text-secondary); line-height: 1.45; }
-    .info { position: relative; display: inline-flex; vertical-align: -1px; margin-left: 4px; color: var(--text-secondary); opacity: 0.6; cursor: help; }
+    .info { position: relative; display: inline-flex; vertical-align: -1px; margin-left: 4px; color: var(--text-secondary); opacity: 0.6; }
     .info:hover, .info:focus-visible { opacity: 1; }
     .info-pop { position: absolute; left: calc(-10px + var(--dx, 0px)); max-width: calc(100vw - 24px); top: calc(100% + 8px); width: 280px; text-align: left; padding: 8px 10px; border-radius: 6px; background: var(--text-primary); color: var(--surface); font-size: 12px; font-weight: 400; line-height: 1.45; letter-spacing: 0; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); display: none; z-index: 5; }
     .info:hover .info-pop, .info:focus-visible .info-pop, :global(.info.open) .info-pop { display: block; animation: info-in .15s ease; }

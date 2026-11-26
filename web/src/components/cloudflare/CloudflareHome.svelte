@@ -228,7 +228,7 @@
     .ns .ui-mono { font-size: 12.5px; }
 
     .summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-    .info { position: relative; display: inline-flex; vertical-align: -1px; margin-left: 3px; color: var(--text-secondary); opacity: 0.6; cursor: help; }
+    .info { position: relative; display: inline-flex; vertical-align: -1px; margin-left: 3px; color: var(--text-secondary); opacity: 0.6; }
     .info:hover, .info:focus-visible { opacity: 1; }
     .info-pop { position: absolute; left: calc(-10px + var(--dx, 0px)); max-width: calc(100vw - 24px); top: calc(100% + 8px); width: 280px; padding: 8px 10px; border-radius: 6px; background: var(--text-primary); color: var(--surface); font-size: 12px; font-weight: 400; line-height: 1.45; text-align: left; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); display: none; z-index: 5; }
     .info:hover .info-pop, .info:focus-visible .info-pop, :global(.info.open) .info-pop { display: block; }

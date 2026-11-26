@@ -81,11 +81,10 @@
 
     /* totals line */
     .slim { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 0; padding: 16px 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-secondary); }
-    .grp { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; padding: 0 24px; }
+    .grp { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; padding: 0 20px; }
     .grp:first-child { padding-left: 0; }
-    .grp + .grp { border-left: 1px solid var(--border); }
     .slim b { font-size: 15px; color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
-    .io { gap: 18px; margin-left: auto; padding-right: 0; cursor: help; }
+    .io { gap: 18px; margin-left: auto; padding-right: 0; }
     .io > span { display: inline-flex; align-items: baseline; gap: 5px; }
     .io :global(svg) { align-self: center; opacity: 0.6; }
     .io small { font-size: 12px; opacity: 0.8; }
@@ -109,7 +108,7 @@
     .d-tr small :global(svg:nth-of-type(2)) { margin-left: 4px; }
     .d-none { padding: 8px 10px; font-size: 12.5px; color: var(--text-secondary); }
 
-    .info { position: relative; display: inline-flex; vertical-align: -1px; margin-left: 4px; color: var(--text-secondary); opacity: 0.6; cursor: help; }
+    .info { position: relative; display: inline-flex; vertical-align: -1px; margin-left: 4px; color: var(--text-secondary); opacity: 0.6; }
     .info:hover, .info:focus-visible { opacity: 1; }
     .info-pop { position: absolute; left: calc(-10px + var(--dx, 0px)); max-width: calc(100vw - 24px); top: calc(100% + 8px); width: 280px; text-align: left; padding: 8px 10px; border-radius: 6px; background: var(--text-primary); color: var(--surface); font-size: 12px; font-weight: 400; line-height: 1.45; letter-spacing: 0; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); display: none; z-index: 5; }
     .info:hover .info-pop, .info:focus-visible .info-pop, :global(.info.open) .info-pop { display: block; animation: info-in .15s ease; }
