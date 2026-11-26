@@ -2,12 +2,9 @@ from flask import Blueprint, jsonify, request
 import subprocess
 import re
 import uuid
-import shlex
 
-from app.core.logger import log
 from app.core.cache import global_state
 from app.services.poller import refresh_tmux_cache
-from app.core.config import VM_CMD_PREFIX
 from app.core import paths
 
 tmux_bp = Blueprint('tmux', __name__)

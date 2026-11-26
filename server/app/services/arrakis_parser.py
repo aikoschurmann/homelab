@@ -1,7 +1,5 @@
 import subprocess
-import os
 import psutil
-from datetime import datetime
 
 from app.core.config import VM_NAME, VM_CMD_PREFIX
 from app.core import server_cfg, paths
@@ -154,7 +152,7 @@ def parse_arrakis_native():
                             "raw": f"{clean_status}{port_link}",
                             "stack": project
                         })
-        except Exception as e:
+        except Exception:
             pass
     except Exception:
         pass

@@ -477,7 +477,6 @@ def candidates():
     from app.core import orbhost
     from app.api.vms import _get_list
     tailnet = _tailnet_ips()
-    names = {h['id']: h['name'] for h in load_hosts()}
     for hid in orbhost.managed():
         token = orbhost.current.set(hid)
         try:

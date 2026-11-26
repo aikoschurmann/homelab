@@ -78,7 +78,7 @@ def daemon_action_stream(daemon_id, action):
                 with global_state.lock:
                     if 'daemons' in global_state.stats:
                         global_state.stats['daemons'] = new_daemons
-            except Exception as e:
+            except Exception:
                 pass
                 
             yield f"data: {json.dumps({'status': 'done', 'msg': 'Done'})}\n\n"
@@ -117,7 +117,7 @@ def container_action_stream(container_id, action):
                     with global_state.lock:
                         if 'containers' in global_state.stats:
                             global_state.stats['containers'] = new_containers
-                except Exception as e:
+                except Exception:
                     pass
                     
                 yield f"data: {json.dumps({'status': 'done', 'msg': f'{container_id} {action}ed'})}\n\n"

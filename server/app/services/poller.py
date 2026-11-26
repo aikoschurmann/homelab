@@ -1,4 +1,4 @@
-import re, time, sys, subprocess, threading, os, json, html, psutil, shutil
+import re, time, subprocess, threading, os, json, html, psutil, shutil
 from app.core.logger import log
 from app.core.config import VM_CMD_PREFIX
 from app.core.cache import global_state
@@ -103,7 +103,7 @@ def poll_services_loop():
                 if self_node:
                     sname = self_node.get('DNSName', '').split('.')[0] or self_node.get('HostName', '')
                     ts_list.append({"ip": self_node.get('TailscaleIPs', [''])[0], "host": sname, "os": self_node.get('OS', ''), "state": "active"})
-                for peer_id, peer in ts_data.get('Peer', {}).items():
+                for _peer_id, peer in ts_data.get('Peer', {}).items():
                     dns = peer.get('DNSName', '')
                     if not dns: continue
                     name = dns.split('.')[0]

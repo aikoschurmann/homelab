@@ -1,0 +1,12 @@
+# Lint for real bugs only (undefined names, unused code, bare excepts, bugbear),
+# not style: the codebase deliberately uses compact one-line statements.
+extend-exclude = ["venv", "static"]
+target-version = "py39"
+
+[lint]
+select = ["F", "E9", "E722", "B"]
+ignore = [
+  "B905",  # zip() without strict=
+  "B023",  # loop var in lambda: every use is consumed inside the same iteration
+  "B904",  # raise ... from err inside except
+]

@@ -384,7 +384,6 @@ def kill_ssh_host(tty):
 @system_bp.route('/vm/ssh/<path:tty>', methods=['DELETE'])
 def kill_ssh_vm(tty):
     import re
-    from app.core.config import VM_CMD_PREFIX
     if not re.match(r'^[a-zA-Z0-9/]+$', tty): return jsonify({"status": "error"})
     try:
         subprocess.run(VM_CMD_PREFIX + ["pkill", "-9", "-t", tty])
@@ -557,7 +556,7 @@ def get_tailscale():
         ts = subprocess.run(["tailscale", "status", "--json"], capture_output=True, text=True, timeout=5)
         ts_data = json.loads(ts.stdout)
         ts_list = []
-        for peer_id, peer in ts_data.get('Peer', {}).items():
+        for _peer_id, peer in ts_data.get('Peer', {}).items():
             dns = peer.get('DNSName', '')
             if not dns: continue
             name = dns.split('.')[0]

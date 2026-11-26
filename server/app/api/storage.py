@@ -8,11 +8,10 @@ unmount and eject. Nothing here can erase, format or rename a drive, by design.
 Drives the user marked as never-to-be-erased are listed in $HOMELAB_HOME/storage.json
 (model name + exact size) and shown as Protected.
 """
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 import json
 import os
 import plistlib
-import re
 import subprocess
 import threading
 import time

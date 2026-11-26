@@ -1,7 +1,7 @@
 """Pi-hole (v6) stats and pausing blocking, for a Pi-hole container in this Mac's Docker or a
 machine. The admin password is read from the container's own environment and stays on the
 server; the API session is kept and reused (Pi-hole allows only a few at once)."""
-import json, subprocess, threading, time, urllib.request, urllib.error
+import json, threading, time
 
 from flask import Blueprint, jsonify, request
 

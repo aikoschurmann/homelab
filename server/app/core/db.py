@@ -1,6 +1,5 @@
 import json
 import sqlite3
-import os
 import time
 from app.core.logger import log
 from app.core.db_writer import DBWriter
@@ -65,7 +64,7 @@ def get_recent_latencies(limit=5):
         conn = sqlite3.connect(DB_PATH, timeout=5)
         c = conn.cursor()
         cutoff = int(time.time()) - 86400
-        c.execute(f'''
+        c.execute('''
             SELECT endpoint_id, latency_ms, status_code, timestamp
             FROM (SELECT endpoint_id, latency_ms, status_code, timestamp, ROW_NUMBER() OVER (PARTITION BY endpoint_id ORDER BY timestamp DESC) as rn FROM api_latency WHERE timestamp >= ?)
             WHERE rn <= ? ORDER BY endpoint_id, rn ASC
@@ -364,6 +363,6 @@ def cleanup_old_metrics():
         now = int(time.time())
         for k, days in keep_days().items():
             get_writer().execute(f'DELETE FROM {KEEP[k][0]} WHERE timestamp < ?', (now - days * 86400,))
-    except Exception as e:
+    except Exception:
         pass
 
